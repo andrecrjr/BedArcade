@@ -1,0 +1,144 @@
+.brand-link {
+  text-decoration: none;
+}
+
+.settings-panel {
+  width: min(100%, 940px);
+  padding: clamp(22px, 4vw, 38px);
+}
+
+.settings-panel > .eyebrow {
+  margin-bottom: 10px;
+}
+
+.settings-panel h1 {
+  margin-bottom: 8px;
+}
+
+.settings-copy,
+.group-note,
+.analog-note p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-copy {
+  margin-bottom: 24px;
+}
+
+#settings-form {
+  display: grid;
+  gap: 20px;
+}
+
+.binding-group {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.binding-group h2,
+.analog-note h2 {
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+.bindings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.binding-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(125px, 0.9fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 8px 10px 8px 13px;
+  background: rgba(5, 9, 18, 0.42);
+  color: #dce5f5;
+  font-size: 12px;
+}
+
+.binding-row select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(157, 174, 219, 0.23);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: #0b1020;
+  color: #f4f7ff;
+  font: inherit;
+}
+
+.binding-row select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.refresh-binding {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+}
+
+.chord-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.chord-selects > span {
+  color: var(--muted);
+}
+
+.group-note {
+  margin: 9px 0 0;
+  font-size: 10px;
+}
+
+.analog-note {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(5, 9, 18, 0.42);
+}
+
+.analog-note h2,
+.analog-note p {
+  margin-bottom: 0;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-actions button {
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.settings-feedback {
+  min-height: 16px;
+  margin: -12px 0 0;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.settings-feedback[data-error='true'] {
+  color: #ffaaa7;
+}
+
+@media (max-width: 650px) {
+  .bindings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-panel {
+    padding: 23px 17px;
+  }
+}

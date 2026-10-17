@@ -30,18 +30,28 @@ async function openNewTab(context: BrowserContext) {
   const page = await context.newPage();
   await page.goto('chrome://newtab/');
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
-  await expect(page.getByRole('heading', { name: /your next stop/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
   return page;
 }
 
 test.beforeEach(async ({ context }) => {
-  await context.route(/^https?:\/\/(alpha|beta)\.test\//, (route) =>
-    route.fulfill({
+  await context.route(/^https?:\/\/(alpha|beta)\.test\//, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/favicon.svg') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="#8fffc7"/></svg>',
+      });
+      return;
+    }
+
+    await route.fulfill({
       status: 200,
       contentType: 'text/html',
-      body: '<!doctype html><button>Game control</button>',
-    }),
-  );
+      body: '<!doctype html><link rel="icon" href="/favicon.svg"><button>Game control</button>',
+    });
+  });
   await context.route('https://www.youtube.com/**', (route) =>
     route.fulfill({
       status: 200,
@@ -75,21 +85,29 @@ test('overrides every new tab and focuses the first starter shortcut', async ({ 
   await expect(secondTab.locator('[data-launch="ac-jr"]')).toBeFocused();
 });
 
-test('keeps website entry and shortcut creation at the top of the new tab', async ({ context }) => {
+test('centers the launcher and shortcuts in one panel', async ({ context }) => {
   const page = await openNewTab(context);
 
-  await expect(page.getByRole('heading', { name: 'New destination' })).toBeVisible();
+  await expect(page.locator('.home-panel')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Website address' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open A', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Launch A', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add shortcut' })).toBeVisible();
+  await expect(page.locator('.keyboard-panel')).toHaveCount(0);
 
-  const destinationTop = await page
-    .locator('.destination-bar')
-    .evaluate((node) => node.getBoundingClientRect().top);
-  const shortcutsTop = await page
-    .locator('#pin-grid')
-    .evaluate((node) => node.getBoundingClientRect().top);
-  expect(destinationTop).toBeLessThan(shortcutsTop);
+  const panelLayout = await page.locator('.home-panel').evaluate((panel) => {
+    const rect = panel.getBoundingClientRect();
+    return {
+      left: rect.left,
+      width: rect.width,
+      viewport: window.innerWidth,
+      formTop: panel.querySelector('#site-form')!.getBoundingClientRect().top,
+      shortcutsTop: panel.querySelector('#pin-grid')!.getBoundingClientRect().top,
+    };
+  });
+  expect(
+    Math.abs(panelLayout.left + panelLayout.width / 2 - panelLayout.viewport / 2),
+  ).toBeLessThan(2);
+  expect(panelLayout.formTop).toBeLessThan(panelLayout.shortcutsTop);
 
   const pageHeight = await page.evaluate(() => ({
     content: document.documentElement.scrollHeight,
@@ -98,22 +116,19 @@ test('keeps website entry and shortcut creation at the top of the new tab', asyn
   expect(pageHeight.content).toBeLessThanOrEqual(pageHeight.viewport);
 });
 
-test('gamepad can reach the address bar from the focused shortcut', async ({ context }) => {
+test('gamepad reaches the address field from the focused shortcut', async ({ context }) => {
   const page = await openNewTab(context);
 
   await sendFrame(page, makeFrame(), true);
-  await sendFrame(page, makeFrame([12]));
-  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused();
-
-  await sendFrame(page, makeFrame(), true);
-  await page.waitForTimeout(220);
   await sendFrame(page, makeFrame([12]));
   await expect(page.locator('#site-url')).toBeFocused();
 });
 
-test('gamepad moves across shortcuts and types on the virtual keyboard', async ({ context }) => {
+test('gamepad types in the floating keyboard on the new tab', async ({ context }) => {
   const page = await openNewTab(context);
   const status = page.locator('#controller-status');
+  const keyboard = page.locator('[data-gamepad-navigator="keyboard"]');
+  const urlShortcuts = keyboard.locator('[data-url-shortcuts]');
 
   await sendFrame(page, makeFrame(), true);
   await expect(status).toContainText('Controller ready');
@@ -122,33 +137,54 @@ test('gamepad moves across shortcuts and types on the virtual keyboard', async (
   await sendFrame(page, makeFrame(), true);
 
   await page.locator('#site-url').focus();
-  await page.locator('[data-key="q"]').focus();
+  await expect(keyboard).toBeVisible();
+  await expect(urlShortcuts).toBeVisible();
+  const siteUrl = page.locator('#site-url');
+  await siteUrl.fill('example');
+  await urlShortcuts.getByRole('button', { name: '.com' }).click();
+  await expect(siteUrl).toHaveValue('example.com');
+  await siteUrl.evaluate((input) => (input as HTMLInputElement).setSelectionRange(0, 0));
+  await urlShortcuts.getByRole('button', { name: 'https://' }).click();
+  await expect(siteUrl).toHaveValue('https://example.com');
+  await keyboard.locator('[data-key-action="clear"]').click();
+  await expect(siteUrl).toHaveValue('');
+
+  await sendFrame(page, makeFrame([13]));
+  await expect(keyboard.locator('[data-key="1"]')).toBeFocused();
+  await sendFrame(page, makeFrame(), true);
+  await keyboard.locator('[data-key="q"]').focus();
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('#site-url')).toHaveValue('q');
   await sendFrame(page, makeFrame(), true);
 
-  await page.locator('[data-key="."]').focus();
+  await keyboard.locator('[data-key="."]').focus();
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('#site-url')).toHaveValue('q.');
   await sendFrame(page, makeFrame(), true);
 
-  await page.locator('[data-key-action="backspace"]').focus();
+  await keyboard.locator('[data-key-action="backspace"]').focus();
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('#site-url')).toHaveValue('q');
   await sendFrame(page, makeFrame(), true);
 
-  await page.locator('[data-key-action="shift"]').focus();
+  await keyboard.locator('[data-key-action="shift"]').focus();
   await sendFrame(page, makeFrame([0]));
-  await expect(page.locator('[data-key-action="shift"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(keyboard.locator('[data-key-action="shift"]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await sendFrame(page, makeFrame(), true);
-  await page.locator('[data-key="z"]').focus();
+  await keyboard.locator('[data-key="z"]').focus();
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('#site-url')).toHaveValue('qZ');
   await sendFrame(page, makeFrame(), true);
 
-  await page.locator('[data-key-action="clear"]').focus();
+  await keyboard.locator('[data-key-action="clear"]').focus();
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('#site-url')).toHaveValue('');
+  await page.locator('#site-label').focus();
+  await expect(keyboard).toBeVisible();
+  await expect(urlShortcuts).toBeHidden();
 });
 
 test('A opens the focused shortcut in the same tab', async ({ context }) => {
@@ -174,6 +210,60 @@ test('shoulder buttons switch tabs from the navigator', async ({ context }) => {
   await sendFrame(navigatorPage, makeFrame(), true);
   await sendFrame(navigatorPage, makeFrame([5]));
   await expect.poll(() => otherPage.evaluate(() => document.visibilityState)).toBe('visible');
+});
+
+test('R3 opens a new navigator tab from the new tab page', async ({ context }) => {
+  const navigatorPage = await openNewTab(context);
+  const initialCount = context.pages().length;
+  const newPagePromise = context.waitForEvent('page');
+
+  await sendFrame(navigatorPage, makeFrame(), true);
+  await sendFrame(navigatorPage, makeFrame([11]));
+
+  const newPage = await newPagePromise;
+  await expect.poll(() => context.pages().length).toBe(initialCount + 1);
+  await expect(newPage).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
+  await expect(newPage.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
+});
+
+test('RB + X refreshes the new tab page', async ({ context }) => {
+  const navigatorPage = await openNewTab(context);
+  await sendFrame(navigatorPage, makeFrame(), true);
+
+  const reload = navigatorPage.waitForEvent('load');
+  await sendFrame(navigatorPage, makeFrame([5]), true);
+  await sendFrame(navigatorPage, makeFrame([2, 5]));
+  await reload;
+
+  await expect(navigatorPage).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
+  await expect(
+    navigatorPage.getByRole('heading', { name: /choose your next world/i }),
+  ).toBeVisible();
+});
+
+test('shoulder navigation keeps working across repeated tab switches', async ({ context }) => {
+  const navigatorPage = await openNewTab(context);
+  for (const page of context.pages()) {
+    if (page !== navigatorPage) await page.close();
+  }
+
+  const firstPage = await context.newPage();
+  await firstPage.goto('https://alpha.test/first');
+  const secondPage = await context.newPage();
+  await secondPage.goto('https://alpha.test/second');
+  await navigatorPage.bringToFront();
+
+  const pages = [navigatorPage, firstPage, secondPage];
+  let currentIndex = 0;
+  for (const button of [5, 5, 5, 4, 4, 5, 4, 5]) {
+    const nextIndex = (currentIndex + (button === 5 ? 1 : -1) + pages.length) % pages.length;
+    await sendFrame(pages[currentIndex], makeFrame(), true);
+    await sendFrame(pages[currentIndex], makeFrame([button]));
+    await expect
+      .poll(() => pages[nextIndex].evaluate(() => document.visibilityState))
+      .toBe('visible');
+    currentIndex = nextIndex;
+  }
 });
 
 test('opens URLs in the current tab and rejects non-web protocols', async ({ context }) => {
@@ -219,4 +309,27 @@ test('adds, edits, and removes pins while preserving changes after reload', asyn
   await expect(page.getByRole('button', { name: /open alpha games/i })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('button', { name: /open alpha games/i })).toHaveCount(0);
+});
+
+test('renders Chromium’s favicon fallback before using the cached site favicon', async ({
+  context,
+}) => {
+  const page = await openNewTab(context);
+  await page.locator('#site-url').fill('https://alpha.test/arcade');
+  await page.locator('#site-label').fill('Alpha Arcade');
+  await page.getByRole('button', { name: 'Add shortcut' }).click();
+
+  let tile = page.getByRole('button', { name: 'Open Alpha Arcade, alpha.test' });
+  await expect(tile.locator('.tile-favicon')).toBeVisible();
+  await expect(tile.locator('.tile-favicon')).toHaveJSProperty('naturalWidth', 32);
+
+  const faviconResponse = page.waitForResponse('https://alpha.test/favicon.svg');
+  await tile.click();
+  await expect(page).toHaveURL('https://alpha.test/arcade');
+  await faviconResponse;
+  await page.goBack();
+  await page.reload();
+
+  tile = page.getByRole('button', { name: 'Open Alpha Arcade, alpha.test' });
+  await expect(tile.locator('.tile-favicon')).toBeVisible();
 });

@@ -26,9 +26,10 @@ function center(el: HTMLElement) {
 }
 
 export function nearest(current: HTMLElement | null, direction: Direction): HTMLElement | null {
-  const all = candidates();
-  if (!all.length) return null;
-  if (!current || !all.includes(current)) return all[0];
+  const keyboard = current?.closest<HTMLElement>('[data-gamepad-navigator="keyboard"]') ?? null;
+  const all = candidates().filter((candidate) => !keyboard || keyboard.contains(candidate));
+  if (!all.length) return keyboard ? current : null;
+  if (!current || !all.includes(current)) return all[0] ?? current;
   const from = center(current);
   let best: HTMLElement | null = null;
   let bestScore = Infinity;
@@ -47,5 +48,5 @@ export function nearest(current: HTMLElement | null, direction: Direction): HTML
       best = el;
     }
   }
-  return best;
+  return best ?? (keyboard ? current : null);
 }

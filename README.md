@@ -24,6 +24,12 @@ npm run build
 npm run zip
 ```
 
+## Recursos visuais
+
+- `public/gamepad-navigator-icon.svg` é a origem vetorial da marca.
+- `public/icons/` contém os ícones de 16, 32, 48 e 128 px usados pelo Chrome e como favicon das páginas da extensão.
+- `public/gamepad-navigator-poster.png` é o banner promocional de 1400 × 560 px para o site ou a página da extensão.
+
 ## Testar
 
 Os testes E2E usam Playwright com a extensão WXT em modo `e2e`. Na primeira execução, instale o Chromium do Playwright e rode a suíte:
@@ -49,7 +55,7 @@ Para validar um controle físico manualmente:
 - Sem suporte a `chrome://`, Chrome Web Store e outras páginas protegidas.
 - Não alcança elementos internos de shadow roots fechados, iframes ou canvas.
 - `.click()` não cria eventos `isTrusted`, portanto alguns sites podem bloquear ações.
-- O teclado virtual serve para informar endereços no launcher; ele não digita dentro dos sites.
+- O teclado flutuante aparece ao focar campos de texto e áreas de texto em páginas HTTP e HTTPS compatíveis e na nova aba.
 - A seleção usa elementos visíveis no viewport; controles com telas extensas podem exigir rolagem.
 - Mapeamento assume `mapping === 'standard'` (gamepads não padronizados podem divergir).
 - Os atalhos ficam salvos no perfil local do Chrome e não são sincronizados entre dispositivos.

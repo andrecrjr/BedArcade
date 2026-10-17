@@ -1,4 +1,13 @@
 import type { Direction } from './spatial';
+import {
+  DEFAULT_GAMEPAD_BINDINGS,
+  GAMEPAD_BINDINGS_STORAGE_KEY,
+  loadGamepadBindings,
+  normalizeGamepadBindings,
+  type GamepadBindings,
+} from './gamepad-bindings';
+
+const TAB_CHORD_WINDOW_MS = 180;
 
 export type GamepadFrame = {
   id: string;
@@ -13,6 +22,8 @@ export type GamepadAction =
   | { type: 'move'; direction: Direction }
   | { type: 'activate' }
   | { type: 'back' }
+  | { type: 'refresh' }
+  | { type: 'new-tab' }
   | { type: 'previous-tab' }
   | { type: 'next-tab' }
   | { type: 'scroll'; amount: number };
@@ -68,11 +79,44 @@ export function createGamepadReader(): () => GamepadFrame | null {
 export function startGamepadController({ onAction, onStateChange }: GamepadControllerOptions) {
   const readGamepad = createGamepadReader();
   let frame = 0;
+  let stopped = false;
   let enabled = true;
   let connected = false;
+  let bindings: GamepadBindings = DEFAULT_GAMEPAD_BINDINGS;
+  let bindingsReady = false;
+  let settingsChanged = false;
+  let ignoreButtonEdges = false;
+  let pendingNextTabAt: number | null = null;
   let previousButtons: boolean[] = [];
   let previousGamepadId = '';
   let lastMove = -Infinity;
+  const onStorageChanged = (
+    changes: { [key: string]: chrome.storage.StorageChange },
+    areaName: string,
+  ) => {
+    const change = changes[GAMEPAD_BINDINGS_STORAGE_KEY];
+    if (areaName !== 'local' || !change) return;
+    bindings = normalizeGamepadBindings(change.newValue);
+    bindingsReady = true;
+    settingsChanged = true;
+    ignoreButtonEdges = true;
+    pendingNextTabAt = null;
+  };
+
+  try {
+    chrome.storage.onChanged.addListener(onStorageChanged);
+  } catch {}
+  void loadGamepadBindings()
+    .then((savedBindings) => {
+      if (settingsChanged) return;
+      bindings = savedBindings;
+      ignoreButtonEdges = true;
+    })
+    .catch(() => {})
+    .finally(() => {
+      bindingsReady = true;
+      if (!stopped) frame = requestAnimationFrame(tick);
+    });
 
   function tick(now: number) {
     const pad = readGamepad();
@@ -82,6 +126,7 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
       connected = false;
       previousButtons = [];
       previousGamepadId = '';
+      pendingNextTabAt = null;
       lastMove = -Infinity;
     } else {
       if (!connected) onStateChange({ connected: true, enabled });
@@ -90,26 +135,29 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
       if (pad.id !== previousGamepadId) {
         previousGamepadId = pad.id;
         previousButtons = pad.buttons.map((button) => button.pressed);
+        pendingNextTabAt = null;
         lastMove = -Infinity;
       }
 
       const pressed = (index: number) => Boolean(pad.buttons[index]?.pressed);
-      const edge = (index: number) => pressed(index) && !previousButtons[index];
+      const edge = (index: number) =>
+        !ignoreButtonEdges && pressed(index) && !previousButtons[index];
 
-      if (edge(9)) {
+      if (bindingsReady && edge(bindings.pause)) {
         enabled = !enabled;
+        if (!enabled) pendingNextTabAt = null;
         onStateChange({ connected: true, enabled });
       }
 
-      if (enabled) {
+      if (enabled && bindingsReady) {
         const x = pad.axes[0] ?? 0;
         const y = pad.axes[1] ?? 0;
         let direction: Direction | null = null;
 
-        if (pressed(12)) direction = 'up';
-        else if (pressed(13)) direction = 'down';
-        else if (pressed(14)) direction = 'left';
-        else if (pressed(15)) direction = 'right';
+        if (pressed(bindings.moveUp)) direction = 'up';
+        else if (pressed(bindings.moveDown)) direction = 'down';
+        else if (pressed(bindings.moveLeft)) direction = 'left';
+        else if (pressed(bindings.moveRight)) direction = 'right';
         else if (Math.abs(x) > 0.55 || Math.abs(y) > 0.55) {
           direction =
             Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : y > 0 ? 'down' : 'up';
@@ -122,18 +170,39 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
 
         const scrollY = pad.axes[3] ?? 0;
         if (Math.abs(scrollY) > 0.25) onAction({ type: 'scroll', amount: scrollY * 15 });
-        if (edge(0)) onAction({ type: 'activate' });
-        if (edge(1)) onAction({ type: 'back' });
-        if (edge(4)) onAction({ type: 'previous-tab' });
-        if (edge(5)) onAction({ type: 'next-tab' });
+        if (edge(bindings.activate)) onAction({ type: 'activate' });
+        if (edge(bindings.back)) onAction({ type: 'back' });
+        if (edge(bindings.previousTab)) onAction({ type: 'previous-tab' });
+
+        const refreshChord =
+          pressed(bindings.refreshModifier) &&
+          pressed(bindings.refreshTrigger) &&
+          (edge(bindings.refreshModifier) || edge(bindings.refreshTrigger));
+        if (refreshChord) {
+          pendingNextTabAt = null;
+          onAction({ type: 'refresh' });
+        } else if (edge(bindings.nextTab)) pendingNextTabAt = now;
+
+        if (pendingNextTabAt !== null && now - pendingNextTabAt >= TAB_CHORD_WINDOW_MS) {
+          pendingNextTabAt = null;
+          onAction({ type: 'next-tab' });
+        }
+
+        if (edge(bindings.newTab)) onAction({ type: 'new-tab' });
       }
 
       previousButtons = pad.buttons.map((button) => button.pressed);
+      ignoreButtonEdges = false;
     }
 
     frame = requestAnimationFrame(tick);
   }
 
-  frame = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(frame);
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(frame);
+    try {
+      chrome.storage.onChanged.removeListener(onStorageChanged);
+    } catch {}
+  };
 }

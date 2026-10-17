@@ -1,7 +1,23 @@
 import { startGamepadController, type GamepadAction } from '../../lib/gamepad';
+import {
+  DEFAULT_GAMEPAD_BINDINGS,
+  GAMEPAD_BINDINGS_STORAGE_KEY,
+  gamepadButtonName,
+  loadGamepadBindings,
+  normalizeGamepadBindings,
+  type GamepadBindings,
+} from '../../lib/gamepad-bindings';
 import { loadPinnedSites, savePinnedSites, type PinnedSite } from '../../lib/pins';
+import { attachFloatingKeyboard } from '../../lib/floating-keyboard';
 import { nearest } from '../../lib/spatial';
 import { sendTabAction } from '../../lib/tab-actions';
+import {
+  createDefaultTvModeProfile,
+  getBuiltInTvUrl,
+  loadTvModeProfile,
+  normalizeTvUrl,
+  type TvModeProfile,
+} from '../../lib/tv-mode';
 import { normalizeUrl } from '../../lib/url';
 import './style.css';
 
@@ -18,14 +34,21 @@ const form = element<HTMLFormElement>('site-form');
 const feedback = element<HTMLParagraphElement>('feedback');
 const savePinButton = element<HTMLButtonElement>('save-pin');
 const editPinsButton = element<HTMLButtonElement>('edit-pins');
-const keyboard = document.querySelector<HTMLDivElement>('.key-rows');
 const controllerStatus = element<HTMLDivElement>('controller-status');
+const controllerHints = element<HTMLDivElement>('controller-hints');
+const tvModeSettings = element<HTMLElement>('tv-mode-settings');
+const tvModeEnabled = element<HTMLInputElement>('tv-mode-enabled');
+const tvModeHint = element<HTMLParagraphElement>('tv-mode-hint');
+const tvUrlField = element<HTMLDivElement>('tv-url-field');
+const tvUrlInput = element<HTMLInputElement>('tv-url');
+const stopFloatingKeyboard = attachFloatingKeyboard({ urlShortcuts: true });
 
 let pinnedSites: PinnedSite[] = [];
 let editingPins = false;
 let editingPinId: string | null = null;
-let shiftEnabled = false;
-let typingInput = urlInput;
+let currentTvHostname: string | null = null;
+let currentTvProfile: TvModeProfile | null = null;
+let tvProfileLoadSequence = 0;
 const currentTabId = chrome.tabs
   .getCurrent()
   .then((tab) => tab?.id)
@@ -36,7 +59,149 @@ function setFeedback(message: string, isError = false) {
   feedback.dataset.error = String(isError);
 }
 
-function hostname(url: string) {
+function renderControllerHints(bindings: GamepadBindings) {
+  const hints: [string, string][] = [
+    [
+      `${gamepadButtonName(bindings.moveUp)}/${gamepadButtonName(bindings.moveDown)}/${gamepadButtonName(bindings.moveLeft)}/${gamepadButtonName(bindings.moveRight)}`,
+      'MOVE',
+    ],
+    [gamepadButtonName(bindings.activate), 'SELECT'],
+    [gamepadButtonName(bindings.back), 'BACK'],
+    [
+      `${gamepadButtonName(bindings.previousTab)}/${gamepadButtonName(bindings.nextTab)}`,
+      'SWITCH TABS',
+    ],
+    [
+      `${gamepadButtonName(bindings.refreshModifier)}+${gamepadButtonName(bindings.refreshTrigger)}`,
+      'REFRESH',
+    ],
+    [gamepadButtonName(bindings.newTab), 'NEW TAB'],
+    [gamepadButtonName(bindings.pause), 'PAUSE'],
+  ];
+
+  controllerHints.replaceChildren(
+    ...hints.map(([button, action]) => {
+      const hint = document.createElement('span');
+      const key = document.createElement('kbd');
+      key.textContent = button;
+      hint.append(key, document.createTextNode(action));
+      return hint;
+    }),
+  );
+}
+
+renderControllerHints(DEFAULT_GAMEPAD_BINDINGS);
+let controllerHintsChanged = false;
+const onGamepadBindingsChanged = (
+  changes: { [key: string]: chrome.storage.StorageChange },
+  areaName: string,
+) => {
+  const change = changes[GAMEPAD_BINDINGS_STORAGE_KEY];
+  if (areaName !== 'local' || !change) return;
+  controllerHintsChanged = true;
+  renderControllerHints(normalizeGamepadBindings(change.newValue));
+};
+try {
+  chrome.storage.onChanged.addListener(onGamepadBindingsChanged);
+} catch {}
+void loadGamepadBindings()
+  .then((bindings) => {
+    if (!controllerHintsChanged) renderControllerHints(bindings);
+  })
+  .catch(() => {});
+
+function getInputHostname() {
+  const url = normalizeUrl(urlInput.value);
+  return url ? new URL(url).hostname.toLowerCase() : null;
+}
+
+function renderTvModeSettings() {
+  const hostname = currentTvHostname;
+  const hasSite = Boolean(hostname);
+  tvModeSettings.hidden = !hasSite;
+  tvModeEnabled.disabled = !hasSite;
+  tvUrlField.hidden = !hasSite || !tvModeEnabled.checked;
+
+  if (!hostname) {
+    tvModeHint.textContent = 'Enter a website address to configure TV mode.';
+  } else if (!tvModeEnabled.checked) {
+    tvModeHint.textContent = getBuiltInTvUrl(hostname)
+      ? 'YouTube’s built-in TV route is ready when enabled.'
+      : 'TV mode is off for this site.';
+  } else if (tvUrlInput.value.trim()) {
+    tvModeHint.textContent = 'Every visit will open the TV landing URL.';
+  } else {
+    tvModeHint.textContent = 'Uses the Android TV WebView profile.';
+  }
+}
+
+async function syncTvModeSettings(force = false) {
+  const hostname = getInputHostname();
+  if (!force && hostname === currentTvHostname) {
+    renderTvModeSettings();
+    return;
+  }
+
+  const sequence = ++tvProfileLoadSequence;
+  currentTvHostname = hostname;
+  currentTvProfile = null;
+  tvModeEnabled.checked = false;
+  tvModeEnabled.disabled = true;
+  tvUrlInput.value = '';
+  renderTvModeSettings();
+  if (!hostname) return;
+
+  try {
+    const profile = await loadTvModeProfile(hostname);
+    if (sequence !== tvProfileLoadSequence || getInputHostname() !== hostname) return;
+
+    currentTvProfile = profile;
+    const displayed = profile ?? createDefaultTvModeProfile(hostname);
+    tvModeEnabled.checked = displayed.enabled;
+    tvUrlInput.value = displayed.tvUrl;
+    tvModeEnabled.disabled = false;
+    renderTvModeSettings();
+  } catch {
+    if (sequence !== tvProfileLoadSequence) return;
+    tvModeHint.textContent = 'Could not load this site’s TV settings.';
+  }
+}
+
+async function saveTvModeSettings(url: string) {
+  const hostname = new URL(url).hostname.toLowerCase();
+  if (hostname !== currentTvHostname || tvModeEnabled.disabled) await syncTvModeSettings(true);
+  if (hostname !== currentTvHostname || tvModeEnabled.disabled) return false;
+
+  const tvUrl = normalizeTvUrl(tvUrlInput.value, hostname);
+  if (tvUrl === null) {
+    setFeedback('The TV landing URL must use the same hostname, or be left blank.', true);
+    tvUrlInput.focus();
+    return false;
+  }
+
+  const isCustomUrl = tvUrl !== getBuiltInTvUrl(hostname);
+  if (!currentTvProfile && !tvModeEnabled.checked && !isCustomUrl) return true;
+
+  try {
+    const response = (await chrome.runtime.sendMessage({
+      type: 'save-tv-mode-profile',
+      profile: { hostname, enabled: tvModeEnabled.checked, tvUrl },
+    })) as { ok?: boolean; error?: string } | undefined;
+
+    if (!response?.ok) {
+      setFeedback(response?.error ?? 'Could not save TV mode settings.', true);
+      return false;
+    }
+
+    currentTvProfile = { hostname, enabled: tvModeEnabled.checked, tvUrl };
+    return true;
+  } catch {
+    setFeedback('Could not save TV mode settings.', true);
+    return false;
+  }
+}
+
+function displayHostname(url: string) {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
   } catch {
@@ -62,12 +227,21 @@ function createPin(site: PinnedSite) {
   launch.type = 'button';
   launch.className = 'tile-launch';
   launch.dataset.launch = site.id;
-  launch.setAttribute('aria-label', `Open ${site.label}, ${hostname(site.url)}`);
+  launch.setAttribute('aria-label', `Open ${site.label}, ${displayHostname(site.url)}`);
 
   const mark = document.createElement('span');
   mark.className = 'tile-mark';
   mark.setAttribute('aria-hidden', 'true');
   mark.textContent = monogram(site.label);
+
+  const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
+  faviconUrl.searchParams.set('pageUrl', site.url);
+  faviconUrl.searchParams.set('size', '32');
+  const favicon = document.createElement('img');
+  favicon.className = 'tile-favicon';
+  favicon.alt = '';
+  favicon.addEventListener('load', () => mark.replaceChildren(favicon), { once: true });
+  favicon.src = faviconUrl.toString();
 
   const copy = document.createElement('span');
   copy.className = 'tile-copy';
@@ -76,7 +250,7 @@ function createPin(site: PinnedSite) {
   name.textContent = site.label;
   const address = document.createElement('span');
   address.className = 'tile-url';
-  address.textContent = hostname(site.url);
+  address.textContent = displayHostname(site.url);
   copy.append(name, address);
   launch.append(mark, copy);
   launch.addEventListener('click', () => window.location.assign(site.url));
@@ -131,6 +305,7 @@ function clearPinForm() {
   urlInput.value = '';
   labelInput.value = '';
   savePinButton.textContent = 'Add shortcut';
+  void syncTvModeSettings(true);
 }
 
 function editPin(site: PinnedSite) {
@@ -139,9 +314,8 @@ function editPin(site: PinnedSite) {
   labelInput.value = site.label;
   savePinButton.textContent = 'Save changes';
   setFeedback(`Editing ${site.label}`);
-  document
-    .querySelector('.destination-bar')
-    ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  void syncTvModeSettings(true);
+  document.querySelector('#site-form')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   urlInput.focus({ preventScroll: true });
 }
 
@@ -173,9 +347,11 @@ async function savePin() {
     return;
   }
 
+  if (!(await saveTvModeSettings(url))) return;
+
   const site: PinnedSite = {
     id: editingPinId ?? crypto.randomUUID(),
-    label: labelInput.value.trim() || hostname(url),
+    label: labelInput.value.trim() || displayHostname(url),
     url,
   };
 
@@ -194,29 +370,15 @@ async function savePin() {
   }
 }
 
-function goToAddress() {
+async function goToAddress() {
   const url = normalizeUrl(urlInput.value);
   if (!url) {
     setFeedback('Enter a valid HTTP or HTTPS website address.', true);
     urlInput.focus();
     return;
   }
+  if (!(await saveTvModeSettings(url))) return;
   window.location.assign(url);
-}
-
-function insertText(input: HTMLInputElement, text: string) {
-  const start = input.selectionStart ?? input.value.length;
-  const end = input.selectionEnd ?? input.value.length;
-  input.setRangeText(text, start, end, 'end');
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function backspace(input: HTMLInputElement) {
-  let start = input.selectionStart ?? input.value.length;
-  const end = input.selectionEnd ?? input.value.length;
-  if (start === end && start > 0) start -= 1;
-  input.setRangeText('', start, end, 'end');
-  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function activateFocusedElement() {
@@ -226,6 +388,20 @@ function activateFocusedElement() {
 
 function moveFocus(direction: 'up' | 'down' | 'left' | 'right') {
   const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
+  if (
+    direction === 'down' &&
+    keyboard &&
+    keyboard.style.display !== 'none' &&
+    !keyboard.contains(active)
+  ) {
+    const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key]');
+    if (firstKey) {
+      firstKey.focus({ preventScroll: true });
+      return;
+    }
+  }
+
   const next = nearest(active, direction);
   if (next) {
     next.focus({ preventScroll: true });
@@ -241,10 +417,12 @@ function handleGamepadAction(action: GamepadAction) {
   else if (action.type === 'activate') activateFocusedElement();
   else if (action.type === 'scroll') window.scrollBy(0, action.amount);
   else if (action.type === 'back') void currentTabId.then((id) => sendTabAction('back', id));
+  else if (action.type === 'refresh') window.location.reload();
   else if (action.type === 'previous-tab')
     void currentTabId.then((id) => sendTabAction('prev-tab', id));
   else if (action.type === 'next-tab')
     void currentTabId.then((id) => sendTabAction('next-tab', id));
+  else if (action.type === 'new-tab') void currentTabId.then((id) => sendTabAction('new-tab', id));
 }
 
 function handleGamepadState(state: { connected: boolean; enabled: boolean }) {
@@ -267,54 +445,12 @@ editPinsButton.addEventListener('click', () => {
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  goToAddress();
+  void goToAddress();
 });
 
-element<HTMLButtonElement>('save-pin').addEventListener('click', () => void savePin());
-
-urlInput.addEventListener('focus', () => (typingInput = urlInput));
-labelInput.addEventListener('focus', () => (typingInput = labelInput));
-
-keyboard?.addEventListener('click', (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
-  if (!button) return;
-
-  const action = button.dataset.keyAction;
-  if (action === 'shift') {
-    shiftEnabled = !shiftEnabled;
-    button.setAttribute('aria-pressed', String(shiftEnabled));
-    keyboard.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((key) => {
-      const value = key.dataset.key ?? '';
-      if (/^[a-z]$/i.test(value))
-        key.textContent = shiftEnabled ? value.toUpperCase() : value.toLowerCase();
-    });
-    return;
-  }
-  if (action === 'clear') {
-    typingInput.value = '';
-    typingInput.dispatchEvent(new Event('input', { bubbles: true }));
-    setFeedback('Address cleared.');
-    return;
-  }
-  if (action === 'backspace') {
-    backspace(typingInput);
-    return;
-  }
-
-  const key = button.dataset.key;
-  if (key !== undefined) {
-    insertText(typingInput, /^[a-z]$/i.test(key) && shiftEnabled ? key.toUpperCase() : key);
-    if (shiftEnabled) {
-      shiftEnabled = false;
-      const shift = keyboard.querySelector<HTMLButtonElement>('[data-key-action="shift"]');
-      shift?.setAttribute('aria-pressed', 'false');
-      keyboard.querySelectorAll<HTMLButtonElement>('[data-key]').forEach((letter) => {
-        const value = letter.dataset.key ?? '';
-        if (/^[a-z]$/i.test(value)) letter.textContent = value.toLowerCase();
-      });
-    }
-  }
-});
+urlInput.addEventListener('input', () => void syncTvModeSettings());
+tvModeEnabled.addEventListener('change', renderTvModeSettings);
+savePinButton.addEventListener('click', () => void savePin());
 
 void loadPinnedSites()
   .then((sites) => {
@@ -328,4 +464,14 @@ const stopGamepad = startGamepadController({
   onStateChange: handleGamepadState,
 });
 
-window.addEventListener('pagehide', stopGamepad, { once: true });
+window.addEventListener(
+  'pagehide',
+  () => {
+    stopGamepad();
+    stopFloatingKeyboard();
+    try {
+      chrome.storage.onChanged.removeListener(onGamepadBindingsChanged);
+    } catch {}
+  },
+  { once: true },
+);

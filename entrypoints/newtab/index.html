@@ -4,197 +4,119 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080e18" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
     <title>Gamepad Navigator</title>
   </head>
   <body>
     <div class="shell">
       <header class="topbar">
         <div class="brand" aria-label="Gamepad Navigator">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 40 32" fill="none">
-              <path
-                d="M11.2 5.5h17.6c3.2 0 5.9 2.3 6.5 5.4l2 9.7c.8 3.8-3.6 6.5-6.6 4.1l-5.2-4.1h-11l-5.2 4.1c-3 2.4-7.4-.3-6.6-4.1l2-9.7c.6-3.1 3.3-5.4 6.5-5.4Z"
-                stroke="currentColor"
-                stroke-width="2.4"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M12.5 11v7M9 14.5h7"
-                stroke="currentColor"
-                stroke-width="2.4"
-                stroke-linecap="round"
-              />
-              <circle cx="27" cy="13" r="1.6" fill="currentColor" />
-              <circle cx="31" cy="17" r="1.6" fill="currentColor" />
-            </svg>
-          </span>
+          <img class="brand-mark" src="/icons/icon-128.png" alt="" aria-hidden="true" />
           <span class="brand-name">GAMEPAD <strong>NAVIGATOR</strong></span>
         </div>
-        <div id="controller-status" class="controller-status" role="status" aria-live="polite">
-          Press any controller button to connect
+        <div class="topbar-actions">
+          <a class="settings-link" href="/settings.html">Controller settings</a>
+          <div id="controller-status" class="controller-status" role="status" aria-live="polite">
+            Press any controller button to connect
+          </div>
         </div>
       </header>
-
-      <section class="destination-bar" aria-labelledby="address-title">
-        <div class="destination-heading">
-          <p class="eyebrow">QUICK LAUNCH</p>
-          <h2 id="address-title">New destination</h2>
-          <p>Open a website or add it to shortcuts.</p>
-        </div>
-
-        <form id="site-form" novalidate>
-          <div class="address-controls">
-            <label for="site-url">Website address</label>
-            <div class="address-row">
-              <input
-                id="site-url"
-                name="url"
-                type="text"
-                inputmode="url"
-                autocomplete="url"
-                autocapitalize="none"
-                spellcheck="false"
-                placeholder="example.com"
-                aria-describedby="url-hint feedback"
-              />
-              <button class="open-button" type="submit">Open <kbd>A</kbd></button>
-            </div>
-          </div>
-          <div class="pin-form-row">
-            <label class="visually-hidden" for="site-label">Shortcut name (optional)</label>
-            <input
-              id="site-label"
-              name="label"
-              type="text"
-              autocomplete="off"
-              placeholder="Shortcut name (optional)"
-            />
-            <button id="save-pin" class="pin-button" type="button">Add shortcut</button>
-          </div>
-          <p id="url-hint" class="field-hint">A website address only. Domains open with HTTPS.</p>
-          <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
-        </form>
-      </section>
 
       <main>
         <section class="home-panel" aria-labelledby="welcome-title">
           <div class="welcome">
-            <p class="eyebrow">YOUR BROWSER, READY TO PLAY</p>
-            <h1 id="welcome-title">Your next stop<br /><span>is one button away.</span></h1>
-            <p class="welcome-copy">Choose a shortcut below or add a website above.</p>
+            <p class="eyebrow">QUICK LAUNCH <span>·</span> PLAYER HUB</p>
+            <h1 id="welcome-title">Choose your <span>next world.</span></h1>
+            <p class="welcome-copy">Jump into a favorite or enter a website address.</p>
           </div>
 
-          <div class="section-heading">
-            <div>
-              <h2>Your shortcuts</h2>
-              <p>Use the D-pad or stick to browse</p>
+          <form id="site-form" novalidate>
+            <div class="address-controls">
+              <label for="site-url">Website address</label>
+              <div class="address-row">
+                <input
+                  id="site-url"
+                  name="url"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="url"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="example.com"
+                  aria-describedby="feedback"
+                />
+                <button class="open-button" type="submit">Launch <kbd>A</kbd></button>
+              </div>
             </div>
-            <button id="edit-pins" class="quiet-button" type="button">Edit</button>
-          </div>
-          <div id="pin-grid" class="pin-grid" role="group" aria-label="Pinned websites"></div>
-        </section>
 
-        <aside class="keyboard-panel" aria-label="Controller controls">
-          <section class="keyboard" aria-label="On-screen URL keyboard">
-            <div class="keyboard-heading">
-              <h3>URL keyboard</h3>
-              <span>D-pad to a key · A to type</span>
+            <section
+              id="tv-mode-settings"
+              class="tv-mode-settings"
+              aria-label="TV mode settings"
+              hidden
+            >
+              <div class="tv-mode-row">
+                <label class="tv-mode-toggle" for="tv-mode-enabled">
+                  <input id="tv-mode-enabled" type="checkbox" disabled />
+                  <span>Open this site in TV mode</span>
+                </label>
+                <p id="tv-mode-hint" class="tv-mode-hint"></p>
+              </div>
+              <div id="tv-url-field" class="tv-url-field" hidden>
+                <label for="tv-url">TV landing URL</label>
+                <input
+                  id="tv-url"
+                  name="tv-url"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="url"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="Blank uses the Android TV profile"
+                  aria-describedby="tv-url-help"
+                />
+                <p id="tv-url-help" class="tv-url-help">
+                  Use a URL on this site. YouTube uses its built-in /tv route.
+                </p>
+              </div>
+            </section>
+
+            <div class="pin-form-row">
+              <label class="visually-hidden" for="site-label">Shortcut name (optional)</label>
+              <input
+                id="site-label"
+                name="label"
+                type="text"
+                autocomplete="off"
+                placeholder="Shortcut name (optional)"
+              />
+              <button id="save-pin" class="pin-button" type="button">Add shortcut</button>
             </div>
-            <div class="key-rows">
-              <div class="key-row" aria-label="Numbers">
-                <button class="key" data-key="1" type="button">1</button>
-                <button class="key" data-key="2" type="button">2</button>
-                <button class="key" data-key="3" type="button">3</button>
-                <button class="key" data-key="4" type="button">4</button>
-                <button class="key" data-key="5" type="button">5</button>
-                <button class="key" data-key="6" type="button">6</button>
-                <button class="key" data-key="7" type="button">7</button>
-                <button class="key" data-key="8" type="button">8</button>
-                <button class="key" data-key="9" type="button">9</button>
-                <button class="key" data-key="0" type="button">0</button>
+            <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+          </form>
+
+          <section class="shortcut-section" aria-labelledby="shortcuts-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker">YOUR LIBRARY</p>
+                <h2 id="shortcuts-title">Quick launch</h2>
+                <p>Pick a favorite and jump back in.</p>
               </div>
-              <div class="key-row">
-                <button class="key" data-key="q" type="button">q</button>
-                <button class="key" data-key="w" type="button">w</button>
-                <button class="key" data-key="e" type="button">e</button>
-                <button class="key" data-key="r" type="button">r</button>
-                <button class="key" data-key="t" type="button">t</button>
-                <button class="key" data-key="y" type="button">y</button>
-                <button class="key" data-key="u" type="button">u</button>
-                <button class="key" data-key="i" type="button">i</button>
-                <button class="key" data-key="o" type="button">o</button>
-                <button class="key" data-key="p" type="button">p</button>
-              </div>
-              <div class="key-row key-row-inset">
-                <button class="key" data-key="a" type="button">a</button>
-                <button class="key" data-key="s" type="button">s</button>
-                <button class="key" data-key="d" type="button">d</button>
-                <button class="key" data-key="f" type="button">f</button>
-                <button class="key" data-key="g" type="button">g</button>
-                <button class="key" data-key="h" type="button">h</button>
-                <button class="key" data-key="j" type="button">j</button>
-                <button class="key" data-key="k" type="button">k</button>
-                <button class="key" data-key="l" type="button">l</button>
-              </div>
-              <div class="key-row key-row-wide">
-                <button
-                  class="key utility-key"
-                  data-key-action="shift"
-                  type="button"
-                  aria-label="Shift"
-                >
-                  ⇧
-                </button>
-                <button class="key" data-key="z" type="button">z</button>
-                <button class="key" data-key="x" type="button">x</button>
-                <button class="key" data-key="c" type="button">c</button>
-                <button class="key" data-key="v" type="button">v</button>
-                <button class="key" data-key="b" type="button">b</button>
-                <button class="key" data-key="n" type="button">n</button>
-                <button class="key" data-key="m" type="button">m</button>
-                <button
-                  class="key utility-key backspace-key"
-                  data-key-action="backspace"
-                  type="button"
-                  aria-label="Backspace"
-                >
-                  ⌫
-                </button>
-              </div>
-              <div class="key-row symbol-row">
-                <button class="key" data-key="." type="button">.</button>
-                <button class="key" data-key="/" type="button">/</button>
-                <button class="key" data-key=":" type="button">:</button>
-                <button class="key" data-key="-" type="button">-</button>
-                <button class="key" data-key="_" type="button">_</button>
-                <button class="key" data-key="?" type="button">?</button>
-                <button class="key" data-key="&amp;" type="button">&amp;</button>
-                <button class="key" data-key="=" type="button">=</button>
-                <button class="key" data-key="#" type="button">#</button>
-                <button class="key" data-key="%" type="button">%</button>
-              </div>
-              <div class="key-row bottom-key-row">
-                <button class="key utility-key clear-key" data-key-action="clear" type="button">
-                  Clear
-                </button>
-                <button class="key space-key" data-key=" " type="button" aria-label="Space">
-                  Space
-                </button>
-                <button class="key" data-key="+" type="button">+</button>
-                <button class="key" data-key="@" type="button">@</button>
-              </div>
+              <button id="edit-pins" class="quiet-button" type="button">Edit</button>
             </div>
+            <div id="pin-grid" class="pin-grid" role="group" aria-label="Pinned websites"></div>
           </section>
-          <p class="back-hint">
-            <kbd>B</kbd> Back <span>·</span> <kbd>LB/RB</kbd> Switch tabs <span>·</span>
-            <kbd>Start</kbd> Pause controller
-          </p>
-        </aside>
+        </section>
       </main>
 
       <footer class="footer">
-        <span>Works with standard-mapped controllers</span>
-        <span>Enter a URL or pick a shortcut to continue</span>
+        <div id="controller-hints" class="controller-hints" aria-label="Controller controls">
+          <span><kbd>DPAD</kbd> MOVE</span>
+          <span><kbd>A</kbd> SELECT</span>
+          <span><kbd>B</kbd> BACK</span>
+          <span><kbd>LB/RB</kbd> SWITCH TABS</span>
+          <span><kbd>START</kbd> PAUSE</span>
+        </div>
       </footer>
     </div>
     <script type="module" src="./main.ts"></script>

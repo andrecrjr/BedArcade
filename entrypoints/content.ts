@@ -1,5 +1,6 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
+import { attachFloatingKeyboard } from '../lib/floating-keyboard';
 import { sendTabAction } from '../lib/tab-actions';
 
 export default defineContentScript({
@@ -46,6 +47,25 @@ export default defineContentScript({
     status.textContent = 'Gamepad ativo · Start: pausar';
     document.documentElement.appendChild(status);
 
+    const stopFloatingKeyboard = attachFloatingKeyboard();
+
+    if (import.meta.env.MODE === 'e2e') {
+      window.addEventListener('message', (event: MessageEvent<unknown>) => {
+        const message = event.data;
+        if (
+          event.source === window &&
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === 'gamepad-navigator:e2e-tab-action' &&
+          'action' in message &&
+          (message.action === 'prev-tab' || message.action === 'next-tab')
+        ) {
+          sendTabAction(message.action);
+        }
+      });
+    }
+
     function draw() {
       if (!connected || !enabled || !selected || !selected.isConnected) {
         outline.style.display = 'none';
@@ -65,7 +85,33 @@ export default defineContentScript({
       });
     }
 
+    document.addEventListener('focusin', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        selected = target;
+        draw();
+      }
+    });
+
     function move(direction: Direction) {
+      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
+        selected = document.activeElement;
+      const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
+      if (
+        direction === 'down' &&
+        keyboard &&
+        keyboard.style.display !== 'none' &&
+        !keyboard.contains(selected)
+      ) {
+        const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key]');
+        if (firstKey) {
+          selected = firstKey;
+          firstKey.focus({ preventScroll: true });
+          draw();
+          return;
+        }
+      }
+
       const target = nearest(selected, direction);
       if (target) {
         selected = target;
@@ -101,8 +147,10 @@ export default defineContentScript({
         else if (action.type === 'scroll') window.scrollBy(0, action.amount);
         else if (action.type === 'activate') activate();
         else if (action.type === 'back') sendTabAction('back');
+        else if (action.type === 'refresh') window.location.reload();
         else if (action.type === 'previous-tab') sendTabAction('prev-tab');
         else if (action.type === 'next-tab') sendTabAction('next-tab');
+        else if (action.type === 'new-tab') sendTabAction('new-tab');
         if (!selected || !selected.isConnected) selected = candidates()[0] ?? null;
         draw();
       },
@@ -129,6 +177,7 @@ export default defineContentScript({
         cancelAnimationFrame(frame);
         outline.remove();
         status.remove();
+        stopFloatingKeyboard();
       },
       { once: true },
     );
