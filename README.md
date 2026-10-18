@@ -29,6 +29,7 @@ npm run zip
 - `public/gamepad-navigator-icon.svg` é a origem vetorial da marca.
 - `public/icons/` contém os ícones de 16, 32, 48 e 128 px usados pelo Chrome e como favicon das páginas da extensão.
 - `public/gamepad-navigator-poster.png` é o banner promocional de 1400 × 560 px para o site ou a página da extensão.
+- `public/gamepad-icons/` contém prompts em SVG de Xbox e PlayStation do pacote CC0 Kenney Input Prompts; veja `ASSET_CREDITS.md`.
 
 ## Testar
 
@@ -46,8 +47,9 @@ Para validar um controle físico manualmente:
 1. Instale a build de `.output/chrome-mv3` e abra uma nova aba.
 2. Conecte o controle e pressione um botão para que o Chrome o reconheça.
 3. Use D-pad/analógico esquerdo para navegar pelos atalhos ou pelo teclado virtual.
-4. A abre a seleção; B volta; LB/RB trocam abas; Start pausa/retoma.
-5. Os atalhos iniciais incluem AC-JR, YouTube, Google, Steam, CrazyGames e jogos de navegador do itch.io. Adicione, edite ou remova atalhos no launcher.
+4. A/X clica ou escolhe; Select pausa e retoma.
+5. Com o teclado virtual aberto, B o fecha; fora dele, B volta. LB/RB trocam abas.
+6. Os atalhos iniciais incluem AC-JR, YouTube, Google, Steam, CrazyGames e jogos de navegador do itch.io. Adicione, edite ou remova atalhos no launcher.
 
 ## Limitações conhecidas
 

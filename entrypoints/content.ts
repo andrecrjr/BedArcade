@@ -1,6 +1,6 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
-import { attachFloatingKeyboard } from '../lib/floating-keyboard';
+import { attachFloatingKeyboard, hideFloatingKeyboard } from '../lib/floating-keyboard';
 import { showSelectPicker } from '../lib/select-picker';
 import { sendTabAction } from '../lib/tab-actions';
 import {
@@ -140,7 +140,7 @@ export default defineContentScript({
         keyboard.style.display !== 'none' &&
         !keyboard.contains(selected)
       ) {
-        const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key]');
+        const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key="q"]');
         if (firstKey) {
           selected = firstKey;
           firstKey.focus({ preventScroll: true });
@@ -200,6 +200,7 @@ export default defineContentScript({
         else if (action.type === 'activate') activate();
         else if (action.type === 'back') {
           if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
+          else if (hideFloatingKeyboard()) return;
           else sendTabAction('back');
         } else if (action.type === 'refresh') window.location.reload();
         else if (action.type === 'previous-tab') sendTabAction('prev-tab');

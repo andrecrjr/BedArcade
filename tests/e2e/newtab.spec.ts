@@ -87,7 +87,7 @@ test('opens the navigator on first install', async ({ context }) => {
   await expect(page.locator('[data-command-label]')).toHaveText([
     'Move focus',
     'Scroll page',
-    'Open / select',
+    'Click / open focused control',
     'Go back',
     'Previous tab',
     'Next tab',
@@ -95,7 +95,7 @@ test('opens the navigator on first install', async ({ context }) => {
     'Open new tab',
     'Pause / resume',
   ]);
-  await expect(page.locator('#controller-hints span')).toHaveCount(9);
+  await expect(page.locator('#controller-hints > span')).toHaveCount(9);
   await expect(page.locator('#language-select option')).toHaveCount(3);
   await expect
     .poll(() =>
@@ -109,7 +109,7 @@ test('opens the navigator on first install', async ({ context }) => {
   await expect(page.locator('[data-command-label]')).toHaveText([
     'Mover foco',
     'Desplazar página',
-    'Abrir / seleccionar',
+    'Hacer clic / abrir el control enfocado',
     'Volver',
     'Pestaña anterior',
     'Pestaña siguiente',
@@ -122,7 +122,7 @@ test('opens the navigator on first install', async ({ context }) => {
   await expect(page.locator('[data-command-label]')).toHaveText([
     'Mover foco',
     'Rolar a página',
-    'Abrir / selecionar',
+    'Clicar / abrir o controle em foco',
     'Voltar',
     'Aba anterior',
     'Próxima aba',
@@ -135,7 +135,10 @@ test('opens the navigator on first install', async ({ context }) => {
     ...DEFAULT_GAMEPAD_BINDINGS,
     activate: 3,
   });
-  await expect(page.locator('[data-onboarding-command="activate"] kbd')).toHaveText('Y');
+  const activationIcons = page.locator('[data-onboarding-command="activate"] img');
+  await expect(activationIcons).toHaveCount(2);
+  await expect(activationIcons.nth(0)).toHaveAttribute('src', /xbox_button_y\.svg$/);
+  await expect(activationIcons.nth(1)).toHaveAttribute('src', /playstation_button_triangle\.svg$/);
 });
 
 test('keeps existing profiles out of the first-install tutorial after updates', () => {

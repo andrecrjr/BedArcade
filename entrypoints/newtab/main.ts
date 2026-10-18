@@ -2,13 +2,14 @@ import { startGamepadController, type GamepadAction } from '../../lib/gamepad';
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
-  gamepadButtonName,
+  GAMEPAD_SELECT_BUTTON,
   loadGamepadBindings,
   normalizeGamepadBindings,
   type GamepadBindings,
 } from '../../lib/gamepad-bindings';
 import { loadPinnedSites, savePinnedSites, type PinnedSite } from '../../lib/pins';
-import { attachFloatingKeyboard } from '../../lib/floating-keyboard';
+import { attachFloatingKeyboard, hideFloatingKeyboard } from '../../lib/floating-keyboard';
+import { createGamepadPrompt, type GamepadPromptItem } from '../../lib/gamepad-icons';
 import { nearest } from '../../lib/spatial';
 import { showSelectPicker } from '../../lib/select-picker';
 import { sendTabAction } from '../../lib/tab-actions';
@@ -99,49 +100,62 @@ function renderControllerStatus() {
   controllerStatus.textContent = !connected
     ? translate(appLocale, 'controllerConnect')
     : !enabled
-      ? translate(appLocale, 'controllerPaused', {
-          button: gamepadButtonName(currentBindings.pause),
-        })
+      ? translate(appLocale, 'controllerPaused')
       : translate(appLocale, 'controllerReadyDetails');
 }
 
 function controllerCommands(bindings: GamepadBindings) {
-  const directions = [bindings.moveUp, bindings.moveDown, bindings.moveLeft, bindings.moveRight]
-    .map(gamepadButtonName)
-    .join('/');
-
   return [
-    { id: 'move', buttons: `${directions} / LS`, label: 'hintMove' },
-    { id: 'scroll', buttons: 'RS ↑/↓', label: 'hintScroll' },
-    { id: 'activate', buttons: gamepadButtonName(bindings.activate), label: 'hintSelect' },
-    { id: 'back', buttons: gamepadButtonName(bindings.back), label: 'hintBack' },
+    {
+      id: 'move',
+      buttons: [
+        bindings.moveUp,
+        bindings.moveDown,
+        bindings.moveLeft,
+        bindings.moveRight,
+        { stick: 'left' },
+      ],
+      label: 'hintMove',
+    },
+    {
+      id: 'scroll',
+      buttons: [
+        { stick: 'right', direction: 'up' },
+        { stick: 'right', direction: 'down' },
+      ],
+      label: 'hintScroll',
+    },
+    { id: 'activate', buttons: [bindings.activate], label: 'hintSelect' },
+    { id: 'back', buttons: [bindings.back], label: 'hintBack' },
     {
       id: 'previous-tab',
-      buttons: gamepadButtonName(bindings.previousTab),
+      buttons: [bindings.previousTab],
       label: 'hintPreviousTab',
     },
-    { id: 'next-tab', buttons: gamepadButtonName(bindings.nextTab), label: 'hintNextTab' },
+    { id: 'next-tab', buttons: [bindings.nextTab], label: 'hintNextTab' },
     {
       id: 'reload',
-      buttons: `${gamepadButtonName(bindings.refreshModifier)} + ${gamepadButtonName(bindings.refreshTrigger)}`,
+      buttons: [bindings.refreshModifier, bindings.refreshTrigger],
+      chord: true,
       label: 'hintRefresh',
     },
-    { id: 'new-tab', buttons: gamepadButtonName(bindings.newTab), label: 'hintNewTab' },
-    { id: 'pause', buttons: gamepadButtonName(bindings.pause), label: 'hintPause' },
-  ] satisfies { id: string; buttons: string; label: TranslationKey }[];
+    { id: 'new-tab', buttons: [bindings.newTab], label: 'hintNewTab' },
+    { id: 'pause', buttons: [GAMEPAD_SELECT_BUTTON], label: 'hintPause' },
+  ] satisfies {
+    id: string;
+    buttons: GamepadPromptItem[];
+    chord?: boolean;
+    label: TranslationKey;
+  }[];
 }
 
 function renderOnboardingControls() {
-  onboardingControlsCopy.textContent = translate(appLocale, 'onboardingControlsCopy', {
-    nextTab: gamepadButtonName(currentBindings.nextTab),
-    refresh: `${gamepadButtonName(currentBindings.refreshModifier)} + ${gamepadButtonName(currentBindings.refreshTrigger)}`,
-  });
+  onboardingControlsCopy.textContent = translate(appLocale, 'onboardingControlsCopy');
   onboardingCommands.replaceChildren(
-    ...controllerCommands(currentBindings).map(({ id, buttons, label }) => {
+    ...controllerCommands(currentBindings).map(({ id, buttons, chord, label }) => {
       const row = document.createElement('li');
       row.dataset.onboardingCommand = id;
-      const key = document.createElement('kbd');
-      key.textContent = buttons;
+      const key = createGamepadPrompt(buttons, chord);
       const description = document.createElement('span');
       description.dataset.commandLabel = label;
       description.textContent = translate(appLocale, label);
@@ -154,10 +168,9 @@ function renderOnboardingControls() {
 function renderControllerHints(bindings: GamepadBindings) {
   controllerHints.setAttribute('aria-label', translate(appLocale, 'controllerHints'));
   controllerHints.replaceChildren(
-    ...controllerCommands(bindings).map(({ buttons, label }) => {
+    ...controllerCommands(bindings).map(({ buttons, chord, label }) => {
       const hint = document.createElement('span');
-      const keyElement = document.createElement('kbd');
-      keyElement.textContent = buttons;
+      const keyElement = createGamepadPrompt(buttons, chord);
       hint.append(keyElement, document.createTextNode(translate(appLocale, label)));
       return hint;
     }),
@@ -551,7 +564,7 @@ function moveFocus(direction: 'up' | 'down' | 'left' | 'right') {
     keyboard.style.display !== 'none' &&
     !keyboard.contains(active)
   ) {
-    const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key]');
+    const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key="q"]');
     if (firstKey) {
       firstKey.focus({ preventScroll: true });
       return;
@@ -574,6 +587,7 @@ function handleGamepadAction(action: GamepadAction) {
   else if (action.type === 'scroll') window.scrollBy(0, action.amount);
   else if (action.type === 'back') {
     if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
+    else if (hideFloatingKeyboard()) return;
     else void currentTabId.then((id) => sendTabAction('back', id));
   } else if (action.type === 'refresh') window.location.reload();
   else if (action.type === 'previous-tab')

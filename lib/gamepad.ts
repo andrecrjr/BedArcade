@@ -2,6 +2,7 @@ import type { Direction } from './spatial';
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
+  GAMEPAD_SELECT_BUTTON,
   loadGamepadBindings,
   normalizeGamepadBindings,
   type GamepadBindings,
@@ -143,7 +144,7 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
       const edge = (index: number) =>
         !ignoreButtonEdges && pressed(index) && !previousButtons[index];
 
-      if (bindingsReady && edge(bindings.pause)) {
+      if (bindingsReady && edge(GAMEPAD_SELECT_BUTTON)) {
         enabled = !enabled;
         if (!enabled) pendingNextTabAt = null;
         onStateChange({ connected: true, enabled });

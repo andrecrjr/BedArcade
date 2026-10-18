@@ -1,7 +1,7 @@
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDING_NAMES,
-  GAMEPAD_BUTTON_OPTIONS,
+  GAMEPAD_BINDABLE_BUTTON_OPTIONS,
   loadGamepadBindings,
   normalizeGamepadBindings,
   saveGamepadBindings,
@@ -18,6 +18,7 @@ import {
   type AppLocale,
   type TranslationKey,
 } from '../../lib/i18n';
+import { createGamepadPrompt } from '../../lib/gamepad-icons';
 import '../newtab/style.css';
 import './style.css';
 
@@ -25,6 +26,7 @@ const form = document.querySelector<HTMLFormElement>('#settings-form');
 const feedback = document.querySelector<HTMLParagraphElement>('#settings-feedback');
 const restoreButton = document.querySelector<HTMLButtonElement>('#restore-defaults');
 const selects = [...document.querySelectorAll<HTMLSelectElement>('[data-binding]')];
+const fixedPrompts = [...document.querySelectorAll<HTMLElement>('[data-fixed-prompt]')];
 
 if (!form || !feedback || !restoreButton) throw new Error('Controller settings page is incomplete');
 const settingsFeedback = feedback;
@@ -51,7 +53,7 @@ function displayBindings(bindings: typeof DEFAULT_GAMEPAD_BINDINGS) {
       continue;
 
     select.replaceChildren(
-      ...GAMEPAD_BUTTON_OPTIONS.map((button) => {
+      ...GAMEPAD_BINDABLE_BUTTON_OPTIONS.map((button) => {
         const option = document.createElement('option');
         option.value = String(button.value);
         option.textContent = `${button.value} · ${gamepadButtonLabel(appLocale, button.value)}`;
@@ -59,6 +61,13 @@ function displayBindings(bindings: typeof DEFAULT_GAMEPAD_BINDINGS) {
       }),
     );
     select.value = String(bindings[name as keyof typeof DEFAULT_GAMEPAD_BINDINGS]);
+  }
+}
+
+function displayFixedPrompts() {
+  for (const prompt of fixedPrompts) {
+    const button = Number(prompt.dataset.fixedPrompt);
+    prompt.replaceChildren(createGamepadPrompt([button]));
   }
 }
 
@@ -92,6 +101,7 @@ function setLocale(locale: AppLocale) {
 }
 
 applyTranslations(document, appLocale);
+displayFixedPrompts();
 const stopLocaleWatch = watchAppLocale((locale) => {
   languageChanged = true;
   setLocale(locale);

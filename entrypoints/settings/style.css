@@ -78,6 +78,11 @@
   outline-offset: 2px;
 }
 
+.binding-fixed-prompt {
+  justify-self: end;
+  text-align: right;
+}
+
 .refresh-binding {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
 }

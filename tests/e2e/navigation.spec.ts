@@ -102,7 +102,7 @@ async function connectPad(page: Page) {
   await expect(status).toBeAttached();
   await sendFrame(page, makeFrame(), true);
   await expect(status).toBeVisible();
-  await expect(status).toHaveText('Gamepad active · Start: pause');
+  await expect(status).toHaveText('Gamepad active · Select: pause');
   return status;
 }
 
@@ -450,15 +450,15 @@ test('moves immediately after a gamepad reconnects', async ({ page }) => {
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('south');
 });
 
-test('Start blocks navigation and activation until resumed', async ({ page }) => {
+test('Select blocks navigation and activation until resumed', async ({ page }) => {
   await page.goto('https://alpha.test/controls');
   const status = await connectPad(page);
   await sendFrame(page, makeFrame([15]));
   await expect(page.locator('#east')).toBeFocused();
   await sendFrame(page, makeFrame(), true);
 
-  await sendFrame(page, makeFrame([9]));
-  await expect(status).toHaveText('Gamepad paused · Start: resume');
+  await sendFrame(page, makeFrame([8]));
+  await expect(status).toHaveText('Gamepad paused · Select: resume');
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([13]), true);
   // Hold beyond the movement repeat delay to confirm pause suppresses navigation.
@@ -468,8 +468,8 @@ test('Start blocks navigation and activation until resumed', async ({ page }) =>
   await sendFrame(page, makeFrame([0]), true);
   await expect(page.locator('body')).not.toHaveAttribute('data-activated', 'east');
   await sendFrame(page, makeFrame(), true);
-  await sendFrame(page, makeFrame([9]));
-  await expect(status).toHaveText('Gamepad active · Start: pause');
+  await sendFrame(page, makeFrame([8]));
+  await expect(status).toHaveText('Gamepad active · Select: pause');
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('body')).toHaveAttribute('data-activated', 'east');

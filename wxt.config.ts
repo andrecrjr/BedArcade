@@ -13,5 +13,11 @@ export default defineConfig({
     },
     permissions: ['storage', 'declarativeNetRequestWithHostAccess', 'scripting', 'favicon'],
     host_permissions: ['http://*/*', 'https://*/*'],
+    web_accessible_resources: [
+      {
+        resources: ['gamepad-icons/*.svg'],
+        matches: ['http://*/*', 'https://*/*'],
+      },
+    ],
   },
 });

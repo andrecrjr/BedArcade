@@ -1,4 +1,5 @@
 export const GAMEPAD_BINDINGS_STORAGE_KEY = 'gamepadBindings';
+export const GAMEPAD_SELECT_BUTTON = 8;
 
 export const GAMEPAD_BINDING_NAMES = [
   'moveUp',
@@ -12,11 +13,12 @@ export const GAMEPAD_BINDING_NAMES = [
   'previousTab',
   'nextTab',
   'newTab',
-  'pause',
 ] as const;
 
 export type GamepadBindingName = (typeof GAMEPAD_BINDING_NAMES)[number];
-export type GamepadBindings = Record<GamepadBindingName, number>;
+export type GamepadBindings = Record<GamepadBindingName, number> & {
+  pause: typeof GAMEPAD_SELECT_BUTTON;
+};
 
 export const DEFAULT_GAMEPAD_BINDINGS: GamepadBindings = {
   moveUp: 12,
@@ -30,7 +32,7 @@ export const DEFAULT_GAMEPAD_BINDINGS: GamepadBindings = {
   previousTab: 4,
   nextTab: 5,
   newTab: 11,
-  pause: 9,
+  pause: GAMEPAD_SELECT_BUTTON,
 };
 
 export const GAMEPAD_BUTTON_OPTIONS = [
@@ -52,20 +54,29 @@ export const GAMEPAD_BUTTON_OPTIONS = [
   { value: 15, label: 'D-pad right', short: '→' },
 ] as const;
 
+export const GAMEPAD_BINDABLE_BUTTON_OPTIONS = GAMEPAD_BUTTON_OPTIONS.filter(
+  ({ value }) => value !== GAMEPAD_SELECT_BUTTON,
+);
+
 export function normalizeGamepadBindings(value: unknown): GamepadBindings {
   const stored =
     typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  return Object.fromEntries(
+  const bindings = Object.fromEntries(
     GAMEPAD_BINDING_NAMES.map((name) => {
       const button = stored[name];
       return [
         name,
-        typeof button === 'number' && Number.isInteger(button) && button >= 0 && button <= 15
+        typeof button === 'number' &&
+        Number.isInteger(button) &&
+        button >= 0 &&
+        button <= 15 &&
+        button !== GAMEPAD_SELECT_BUTTON
           ? button
           : DEFAULT_GAMEPAD_BINDINGS[name],
       ];
     }),
-  ) as GamepadBindings;
+  ) as Record<GamepadBindingName, number>;
+  return { ...bindings, pause: GAMEPAD_SELECT_BUTTON };
 }
 
 export function gamepadButtonName(button: number) {

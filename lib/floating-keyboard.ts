@@ -1,4 +1,19 @@
-import { applyTranslations, loadAppLocale, watchAppLocale, type TranslationKey } from './i18n';
+import {
+  applyTranslations,
+  detectAppLocale,
+  loadAppLocale,
+  watchAppLocale,
+  type AppLocale,
+  type TranslationKey,
+} from './i18n';
+import { createGamepadPrompt } from './gamepad-icons';
+import {
+  DEFAULT_GAMEPAD_BINDINGS,
+  GAMEPAD_BINDINGS_STORAGE_KEY,
+  loadGamepadBindings,
+  normalizeGamepadBindings,
+  type GamepadBindings,
+} from './gamepad-bindings';
 
 type TextField = HTMLInputElement | HTMLTextAreaElement;
 
@@ -31,6 +46,33 @@ function replaceText(target: TextField, start: number, end: number, text: string
   target.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
 }
 
+export function pressEnter(target: HTMLElement) {
+  if (!isTextField(target)) return false;
+  const keydown = new KeyboardEvent('keydown', {
+    key: 'Enter',
+    code: 'Enter',
+    bubbles: true,
+    cancelable: true,
+  });
+  if (target.dispatchEvent(keydown)) {
+    if (target instanceof HTMLTextAreaElement) {
+      const [start, end] = textRange(target);
+      replaceText(target, start, end, '\n');
+    } else target.form?.requestSubmit();
+  }
+  target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+  return true;
+}
+
+export function hideFloatingKeyboard() {
+  const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
+  if (!keyboard || keyboard.style.display === 'none') return false;
+  const hideKey = keyboard.querySelector<HTMLButtonElement>('[data-key-action="hide"]');
+  if (!hideKey) return false;
+  hideKey.click();
+  return true;
+}
+
 function createKey(
   label: string,
   key?: string,
@@ -54,10 +96,10 @@ function createKey(
     height: '34px',
     flex: '1',
     placeItems: 'center',
-    border: '1px solid rgba(160,183,210,.2)',
-    borderRadius: '6px',
+    border: '1px solid rgba(235,235,235,.24)',
+    borderRadius: '8px',
     padding: '0 6px',
-    background: 'rgba(137,158,184,.12)',
+    background: 'rgba(230,230,230,.1)',
     color: '#e5edf5',
     font: '13px system-ui,sans-serif',
     cursor: 'pointer',
@@ -83,19 +125,20 @@ export function attachFloatingKeyboard({
     position: 'fixed',
     left: '12px',
     top: '12px',
-    zIndex: '2147483647',
+    zIndex: '2147483646',
     display: 'none',
     width: 'min(680px, calc(100vw - 24px))',
     maxHeight: 'min(55vh, 420px)',
     overflowY: 'auto',
     transform: 'none',
     boxSizing: 'border-box',
-    border: '1px solid rgba(164,184,210,.28)',
-    borderRadius: '14px',
+    border: '1px solid rgba(235,235,235,.3)',
+    borderRadius: '18px',
     padding: '12px',
-    background: 'rgba(15,25,38,.97)',
+    background: 'linear-gradient(145deg, rgba(48,49,51,.98), rgba(29,30,32,.99))',
+    backdropFilter: 'blur(18px) saturate(110%)',
     color: '#f5f8fc',
-    boxShadow: '0 12px 36px rgba(0,0,0,.45)',
+    boxShadow: '0 18px 48px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.12)',
     font: '14px system-ui,sans-serif',
     pointerEvents: 'none',
   });
@@ -116,6 +159,43 @@ export function attachFloatingKeyboard({
   Object.assign(hideKey.style, { flex: '0 0 auto', height: '28px', fontSize: '11px' });
   header.append(title, hideKey);
   keyboard.append(header);
+
+  const controllerHint = document.createElement('div');
+  Object.assign(controllerHint.style, {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: '8px 14px',
+    marginBottom: '8px',
+  });
+  let gamepadBindings: GamepadBindings = DEFAULT_GAMEPAD_BINDINGS;
+  let appLocale: AppLocale = detectAppLocale();
+  let localeChanged = false;
+  function renderControllerHint() {
+    const hints = [
+      { button: gamepadBindings.activate, labelKey: 'keyboardType' },
+      { button: gamepadBindings.back, labelKey: 'keyboardHide' },
+    ] satisfies { button: number; labelKey: TranslationKey }[];
+    controllerHint.replaceChildren(
+      ...hints.map(({ button, labelKey }) => {
+        const hint = document.createElement('span');
+        Object.assign(hint.style, { display: 'inline-flex', alignItems: 'center', gap: '4px' });
+        const label = document.createElement('span');
+        label.dataset.i18n = labelKey;
+        Object.assign(label.style, { color: '#c4d1e4', font: '11px system-ui,sans-serif' });
+        hint.append(createGamepadPrompt([button]), label);
+        return hint;
+      }),
+    );
+    applyTranslations(controllerHint, appLocale);
+  }
+  renderControllerHint();
+  keyboard.append(controllerHint);
+
+  const focusStyle = document.createElement('style');
+  focusStyle.textContent =
+    '[data-gamepad-navigator="keyboard"] button:focus { outline: 3px solid #63e6be !important; outline-offset: 2px; background: rgba(99,230,190,.2) !important; box-shadow: 0 0 0 3px rgba(0,0,0,.4); }';
+  keyboard.append(focusStyle);
 
   function addRow(keys: string[], { shift = false, backspace = false } = {}) {
     const row = document.createElement('div');
@@ -272,12 +352,7 @@ export function attachFloatingKeyboard({
     } else if (action === 'clear') {
       replaceText(typingTarget, 0, typingTarget.value.length, '');
     } else if (action === 'enter') {
-      if (typingTarget instanceof HTMLTextAreaElement) {
-        const [start, end] = textRange(typingTarget);
-        replaceText(typingTarget, start, end, '\n');
-      } else {
-        typingTarget.form?.requestSubmit();
-      }
+      pressEnter(typingTarget);
     } else if (button.dataset.key !== undefined) {
       const key = button.dataset.key;
       const text = shiftEnabled && /^[a-z]$/i.test(key) ? key.toUpperCase() : key;
@@ -288,13 +363,37 @@ export function attachFloatingKeyboard({
   }
 
   root.append(keyboard);
-  let localeChanged = false;
+  let bindingsChanged = false;
+  const onBindingsChanged = (
+    changes: { [key: string]: chrome.storage.StorageChange },
+    areaName: string,
+  ) => {
+    const change = changes[GAMEPAD_BINDINGS_STORAGE_KEY];
+    if (areaName !== 'local' || !change) return;
+    bindingsChanged = true;
+    gamepadBindings = normalizeGamepadBindings(change.newValue);
+    renderControllerHint();
+  };
+  try {
+    chrome.storage.onChanged.addListener(onBindingsChanged);
+  } catch {}
+  void loadGamepadBindings()
+    .then((bindings) => {
+      if (bindingsChanged) return;
+      gamepadBindings = bindings;
+      renderControllerHint();
+    })
+    .catch(() => {});
   const stopLocaleWatch = watchAppLocale((locale) => {
     localeChanged = true;
+    appLocale = locale;
     applyTranslations(keyboard, locale);
   });
   void loadAppLocale().then((locale) => {
-    if (!localeChanged) applyTranslations(keyboard, locale);
+    if (!localeChanged) {
+      appLocale = locale;
+      applyTranslations(keyboard, locale);
+    }
   });
   document.addEventListener('focusin', onFocusIn);
   document.addEventListener('focusout', onFocusOut);
@@ -312,6 +411,9 @@ export function attachFloatingKeyboard({
     window.removeEventListener('scroll', schedulePosition, true);
     keyboard.removeEventListener('click', onClick);
     stopLocaleWatch();
+    try {
+      chrome.storage.onChanged.removeListener(onBindingsChanged);
+    } catch {}
     keyboard.remove();
   };
 }
