@@ -1,6 +1,6 @@
-# Gamepad Navigator
+# BedArcade
 
-Extensão Chrome Manifest V3 com WXT + TypeScript. A página de nova aba funciona como um launcher para navegar com controle e teclado.
+BedArcade transforma a nova aba do Chrome em um arcade de navegador: organize atalhos para jogos, ports e recompilações que rodam na web e navegue por eles com controle, teclado ou mouse. Cada jogo define seu próprio suporte a controle; a extensão não injeta compatibilidade dentro dele.
 
 ## Requisitos
 
@@ -26,9 +26,10 @@ npm run zip
 
 ## Recursos visuais
 
-- `public/gamepad-navigator-icon.svg` é a origem vetorial da marca.
+- `public/bedarcade-icon.svg` é a origem vetorial do ícone da marca.
+- `public/bedarcade-logo.png` é a versão raster do ícone da marca.
 - `public/icons/` contém os ícones de 16, 32, 48 e 128 px usados pelo Chrome e como favicon das páginas da extensão.
-- `public/gamepad-navigator-poster.png` é o banner promocional de 1400 × 560 px para o site ou a página da extensão.
+- `public/bedarcade-poster.svg` é a origem vetorial do banner promocional; `public/bedarcade-poster.png` é a versão de 1400 × 560 px para o site ou a página da extensão.
 - `public/gamepad-icons/` contém prompts em SVG de Xbox e PlayStation do pacote CC0 Kenney Input Prompts; veja `ASSET_CREDITS.md`.
 
 ## Testar

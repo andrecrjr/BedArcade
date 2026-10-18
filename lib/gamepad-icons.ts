@@ -262,9 +262,10 @@ function itemIcon(
   const name = item.stick === 'left' ? 'Left stick' : 'Right stick';
   const direction = item.direction ? ' ' + item.direction : '';
   const prefix = platform === 'xbox' ? 'xbox' : 'playstation';
+  const stickName = item.stick === 'left' ? 'l' : 'r';
+  const directionSuffix = item.direction ? `_${item.direction}` : '';
   return {
-    filename:
-      prefix + '_stick_' + item.stick + (item.direction ? '_' + item.direction : '') + '.svg',
+    filename: `${prefix}_stick_${stickName}${directionSuffix}.svg`,
     name: name + direction,
     label: name + direction,
   };

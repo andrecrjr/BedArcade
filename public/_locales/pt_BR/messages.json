@@ -1,4 +1,6 @@
 {
-  "extensionName": { "message": "Gamepad Navigator" },
-  "extensionDescription": { "message": "Navegue na web com um controle." }
+  "extensionName": { "message": "BedArcade" },
+  "extensionDescription": {
+    "message": "Launcher de jogos de navegador com navegação por controle."
+  }
 }
