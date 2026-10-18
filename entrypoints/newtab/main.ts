@@ -1,4 +1,4 @@
-import { startGamepadController, type GamepadAction } from '../../lib/gamepad';
+import { startGamepadController, type GamepadAction, type GamepadState } from '../../lib/gamepad';
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
@@ -14,7 +14,15 @@ import {
   hideFloatingKeyboard,
   submitForm,
 } from '../../lib/floating-keyboard';
-import { createGamepadPrompt, type GamepadPromptItem } from '../../lib/gamepad-icons';
+import {
+  createGamepadPrompt,
+  getGamepadIconFamily,
+  normalizeGamepadIconStyle,
+  saveGamepadIconStyle,
+  setActiveGamepadId,
+  watchGamepadIconChanges,
+  type GamepadPromptItem,
+} from '../../lib/gamepad-icons';
 import { nearest } from '../../lib/spatial';
 import { showSelectPicker } from '../../lib/select-picker';
 import { sendTabAction } from '../../lib/tab-actions';
@@ -66,6 +74,8 @@ const helpLink = element<HTMLButtonElement>('help-link');
 const onboardingPanel = element<HTMLElement>('onboarding-panel');
 const onboardingControlsCopy = element<HTMLParagraphElement>('onboarding-controls-copy');
 const onboardingCommands = element<HTMLUListElement>('onboarding-commands');
+const controllerIconChoice = element<HTMLDivElement>('controller-icon-choice');
+const controllerIconStyleSelect = element<HTMLSelectElement>('controller-icon-style');
 const onboardingStart = element<HTMLButtonElement>('onboarding-start');
 const onboardingSkip = element<HTMLButtonElement>('onboarding-skip');
 const stopFloatingKeyboard = attachFloatingKeyboard({ urlShortcuts: true });
@@ -73,7 +83,11 @@ const stopFloatingKeyboard = attachFloatingKeyboard({ urlShortcuts: true });
 let appLocale: AppLocale = detectAppLocale();
 let pinnedSites: PinnedSite[] = [];
 let currentBindings = DEFAULT_GAMEPAD_BINDINGS;
-let currentControllerState = { connected: false, enabled: true };
+let currentControllerState: GamepadState = {
+  connected: false,
+  enabled: true,
+  gamepadId: null,
+};
 let activeSelectPicker: HTMLDialogElement | null = null;
 let editingPins = false;
 let editingPinId: string | null = null;
@@ -161,7 +175,7 @@ function renderOnboardingControls() {
     ...controllerCommands(currentBindings).map(({ id, buttons, chord, label }) => {
       const row = document.createElement('li');
       row.dataset.onboardingCommand = id;
-      const key = createGamepadPrompt(buttons, chord);
+      const key = createGamepadPrompt(buttons, chord, appLocale);
       const description = document.createElement('span');
       description.dataset.commandLabel = label;
       description.textContent = translate(appLocale, label);
@@ -176,11 +190,16 @@ function renderControllerHints(bindings: GamepadBindings) {
   controllerHints.replaceChildren(
     ...controllerCommands(bindings).map(({ buttons, chord, label }) => {
       const hint = document.createElement('span');
-      const keyElement = createGamepadPrompt(buttons, chord);
+      const keyElement = createGamepadPrompt(buttons, chord, appLocale);
       hint.append(keyElement, document.createTextNode(translate(appLocale, label)));
       return hint;
     }),
   );
+}
+
+function renderGamepadIconChoice(style: 'auto' | 'xbox' | 'playstation') {
+  controllerIconStyleSelect.value = style;
+  controllerIconChoice.hidden = style === 'auto' && getGamepadIconFamily() !== 'generic';
 }
 
 function setLocale(locale: AppLocale) {
@@ -198,6 +217,11 @@ function setLocale(locale: AppLocale) {
 applyTranslations(document, appLocale);
 renderControllerHints(currentBindings);
 renderOnboardingControls();
+const stopGamepadIconWatch = watchGamepadIconChanges((style) => {
+  renderGamepadIconChoice(style);
+  renderControllerHints(currentBindings);
+  renderOnboardingControls();
+});
 const stopLocaleWatch = watchAppLocale((locale) => {
   languageChanged = true;
   setLocale(locale);
@@ -231,6 +255,10 @@ languageSelect.addEventListener('change', () => {
   languageChanged = true;
   setLocale(locale);
   void saveAppLocale(locale).catch(() => setFeedback('feedbackCouldNotSaveLanguage', {}, true));
+});
+controllerIconStyleSelect.addEventListener('change', () => {
+  const style = normalizeGamepadIconStyle(controllerIconStyleSelect.value);
+  void saveGamepadIconStyle(style).catch(() => setFeedback('feedbackCouldNotSaveIconStyle'));
 });
 helpLink.addEventListener('click', () => setOnboardingVisible(true));
 onboardingStart.addEventListener('click', finishOnboarding);
@@ -605,7 +633,8 @@ function handleGamepadAction(action: GamepadAction) {
   else if (action.type === 'new-tab') void currentTabId.then((id) => sendTabAction('new-tab', id));
 }
 
-function handleGamepadState(state: { connected: boolean; enabled: boolean }) {
+function handleGamepadState(state: GamepadState) {
+  setActiveGamepadId(state.gamepadId);
   currentControllerState = state;
   controllerStatus.dataset.connected = String(state.connected);
   controllerStatus.dataset.enabled = String(state.enabled);
@@ -647,6 +676,7 @@ window.addEventListener(
     try {
       chrome.storage.onChanged.removeListener(onGamepadBindingsChanged);
     } catch {}
+    stopGamepadIconWatch();
     stopLocaleWatch();
   },
   { once: true },

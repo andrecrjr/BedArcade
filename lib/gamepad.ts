@@ -34,6 +34,7 @@ export type GamepadAction =
 export interface GamepadState {
   connected: boolean;
   enabled: boolean;
+  gamepadId: string | null;
 }
 
 export interface GamepadControllerOptions {
@@ -125,17 +126,19 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
     const pad = readGamepad();
 
     if (!pad) {
-      if (connected) onStateChange({ connected: false, enabled });
+      if (connected) onStateChange({ connected: false, enabled, gamepadId: null });
       connected = false;
       previousButtons = [];
       previousGamepadId = '';
       pendingNextTabAt = null;
       lastMove = -Infinity;
     } else {
-      if (!connected) onStateChange({ connected: true, enabled });
+      const gamepadChanged = pad.id !== previousGamepadId;
+      if (!connected || gamepadChanged)
+        onStateChange({ connected: true, enabled, gamepadId: pad.id });
       connected = true;
 
-      if (pad.id !== previousGamepadId) {
+      if (gamepadChanged) {
         previousGamepadId = pad.id;
         previousButtons = pad.buttons.map((button) => button.pressed);
         pendingNextTabAt = null;
@@ -149,7 +152,7 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
       if (bindingsReady && edge(GAMEPAD_SELECT_BUTTON)) {
         enabled = !enabled;
         if (!enabled) pendingNextTabAt = null;
-        onStateChange({ connected: true, enabled });
+        onStateChange({ connected: true, enabled, gamepadId: pad.id });
       }
 
       if (enabled && bindingsReady) {

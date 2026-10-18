@@ -138,10 +138,13 @@ test('opens the navigator on first install', async ({ context }) => {
     ...DEFAULT_GAMEPAD_BINDINGS,
     activate: 3,
   });
-  const activationIcons = page.locator('[data-onboarding-command="activate"] img');
-  await expect(activationIcons).toHaveCount(2);
-  await expect(activationIcons.nth(0)).toHaveAttribute('src', /xbox_button_y\.svg$/);
-  await expect(activationIcons.nth(1)).toHaveAttribute('src', /playstation_button_triangle\.svg$/);
+  const activationPrompt = page.locator('[data-onboarding-command="activate"] .gamepad-prompt');
+  await expect(activationPrompt).toHaveAttribute('data-gamepad-family', 'generic');
+  await expect(activationPrompt.locator('.gamepad-prompt-platform')).toHaveCount(1);
+  await expect(activationPrompt.locator('img')).toHaveCount(0);
+  await expect(activationPrompt.locator('.gamepad-prompt-neutral-key')).toHaveText(
+    'Botão superior',
+  );
 });
 
 test('keeps existing profiles out of the first-install tutorial after updates', () => {

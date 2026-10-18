@@ -6,7 +6,7 @@ import {
   type AppLocale,
   type TranslationKey,
 } from './i18n';
-import { createGamepadPrompt } from './gamepad-icons';
+import { createGamepadPrompt, watchGamepadIconChanges } from './gamepad-icons';
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
@@ -216,13 +216,14 @@ export function attachFloatingKeyboard({
         const label = document.createElement('span');
         label.dataset.i18n = labelKey;
         Object.assign(label.style, { color: '#c4d1e4', font: '11px system-ui,sans-serif' });
-        hint.append(createGamepadPrompt([button]), label);
+        hint.append(createGamepadPrompt([button], false, appLocale), label);
         return hint;
       }),
     );
     applyTranslations(controllerHint, appLocale);
   }
   renderControllerHint();
+  const stopGamepadIconWatch = watchGamepadIconChanges(renderControllerHint);
   keyboard.append(controllerHint);
 
   const focusStyle = document.createElement('style');
@@ -439,6 +440,7 @@ export function attachFloatingKeyboard({
 
   return () => {
     cancelAnimationFrame(positionFrame);
+    stopGamepadIconWatch();
     document.removeEventListener('focusin', onFocusIn);
     document.removeEventListener('focusout', onFocusOut);
     document.removeEventListener('pointerdown', onPointerDown, true);

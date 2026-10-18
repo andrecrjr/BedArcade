@@ -176,9 +176,25 @@
                 <span class="onboarding-icon" aria-hidden="true">🕹️</span>
                 <h3 data-i18n="onboardingControlsTitle">2. All controller commands</h3>
                 <p id="onboarding-controls-copy" data-i18n="onboardingControlsCopy">
-                  The icons show Xbox and PlayStation equivalents. Only reload uses two buttons
-                  together.
+                  Prompts use your controller’s icons when recognized. If it can’t be identified,
+                  choose Xbox or PlayStation below. Only reload uses two buttons together.
                 </p>
+                <div id="controller-icon-choice" class="onboarding-icon-choice" hidden>
+                  <p data-i18n="controllerIconChoiceHelp">
+                    Automatic detection could not identify your controller. Choose the labels that
+                    match its buttons.
+                  </p>
+                  <label for="controller-icon-style">
+                    <span data-i18n="controllerIconChoiceLabel">Controller button labels</span>
+                    <select id="controller-icon-style">
+                      <option value="auto" data-i18n="controllerIconStyleAuto">
+                        Detect automatically
+                      </option>
+                      <option value="xbox">Xbox</option>
+                      <option value="playstation">PlayStation</option>
+                    </select>
+                  </label>
+                </div>
                 <ul
                   id="onboarding-commands"
                   class="onboarding-command-list"

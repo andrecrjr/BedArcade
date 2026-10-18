@@ -765,6 +765,39 @@ kbd {
   line-height: 1.6;
 }
 
+.onboarding-icon-choice {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.onboarding-icon-choice[hidden] {
+  display: none;
+}
+
+.onboarding-icon-choice label {
+  display: grid;
+  gap: 5px;
+  color: #dce5f5;
+  font-size: 10px;
+}
+
+.onboarding-icon-choice select {
+  width: 100%;
+  border: 1px solid rgba(157, 174, 219, 0.23);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: #0b1020;
+  color: #f4f7ff;
+  font: inherit;
+}
+
+.onboarding-icon-choice select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .onboarding-command-list {
   display: grid;
   gap: 6px;

@@ -1,6 +1,7 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
 import { attachFloatingKeyboard, hideFloatingKeyboard, submitForm } from '../lib/floating-keyboard';
+import { setActiveGamepadId } from '../lib/gamepad-icons';
 import { showSelectPicker } from '../lib/select-picker';
 import { sendTabAction } from '../lib/tab-actions';
 import {
@@ -211,6 +212,7 @@ export default defineContentScript({
         draw();
       },
       onStateChange(state) {
+        setActiveGamepadId(state.gamepadId);
         connected = state.connected;
         enabled = state.enabled;
         if (!state.connected) {

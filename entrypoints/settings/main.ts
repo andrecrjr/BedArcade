@@ -18,7 +18,7 @@ import {
   type AppLocale,
   type TranslationKey,
 } from '../../lib/i18n';
-import { createGamepadPrompt } from '../../lib/gamepad-icons';
+import { createGamepadPrompt, watchGamepadIconChanges } from '../../lib/gamepad-icons';
 import '../newtab/style.css';
 import './style.css';
 
@@ -67,7 +67,7 @@ function displayBindings(bindings: typeof DEFAULT_GAMEPAD_BINDINGS) {
 function displayFixedPrompts() {
   for (const prompt of fixedPrompts) {
     const button = Number(prompt.dataset.fixedPrompt);
-    prompt.replaceChildren(createGamepadPrompt([button]));
+    prompt.replaceChildren(createGamepadPrompt([button], false, appLocale));
   }
 }
 
@@ -102,6 +102,7 @@ function setLocale(locale: AppLocale) {
 
 applyTranslations(document, appLocale);
 displayFixedPrompts();
+const stopGamepadIconWatch = watchGamepadIconChanges(displayFixedPrompts);
 const stopLocaleWatch = watchAppLocale((locale) => {
   languageChanged = true;
   setLocale(locale);
@@ -137,6 +138,7 @@ restoreButton.addEventListener('click', () => {
 window.addEventListener(
   'pagehide',
   () => {
+    stopGamepadIconWatch();
     stopLocaleWatch();
   },
   { once: true },
