@@ -19,6 +19,18 @@ import {
   type TvModeProfile,
 } from '../../lib/tv-mode';
 import { normalizeUrl } from '../../lib/url';
+import {
+  applyTranslations,
+  detectAppLocale,
+  loadAppLocale,
+  normalizeAppLocale,
+  saveAppLocale,
+  translate,
+  watchAppLocale,
+  type AppLocale,
+  type TranslationKey,
+} from '../../lib/i18n';
+import { completeOnboarding, loadOnboardingCompleted } from '../../lib/onboarding';
 import './style.css';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -28,6 +40,7 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 const pinGrid = element<HTMLDivElement>('pin-grid');
+const homePanel = element<HTMLElement>('home-panel');
 const urlInput = element<HTMLInputElement>('site-url');
 const labelInput = element<HTMLInputElement>('site-label');
 const form = element<HTMLFormElement>('site-form');
@@ -41,56 +54,167 @@ const tvModeEnabled = element<HTMLInputElement>('tv-mode-enabled');
 const tvModeHint = element<HTMLParagraphElement>('tv-mode-hint');
 const tvUrlField = element<HTMLDivElement>('tv-url-field');
 const tvUrlInput = element<HTMLInputElement>('tv-url');
+const languageSelect = element<HTMLSelectElement>('language-select');
+const helpLink = element<HTMLButtonElement>('help-link');
+const onboardingPanel = element<HTMLElement>('onboarding-panel');
+const onboardingControlsCopy = element<HTMLParagraphElement>('onboarding-controls-copy');
+const onboardingCommands = element<HTMLUListElement>('onboarding-commands');
+const onboardingStart = element<HTMLButtonElement>('onboarding-start');
+const onboardingSkip = element<HTMLButtonElement>('onboarding-skip');
 const stopFloatingKeyboard = attachFloatingKeyboard({ urlShortcuts: true });
 
+let appLocale: AppLocale = detectAppLocale();
 let pinnedSites: PinnedSite[] = [];
+let currentBindings = DEFAULT_GAMEPAD_BINDINGS;
+let currentControllerState = { connected: false, enabled: true };
 let editingPins = false;
 let editingPinId: string | null = null;
 let currentTvHostname: string | null = null;
 let currentTvProfile: TvModeProfile | null = null;
 let tvProfileLoadSequence = 0;
+let feedbackKey: TranslationKey | null = null;
+let feedbackValues: Record<string, string | number> = {};
+let onboardingVisible = true;
+let languageChanged = false;
 const currentTabId = chrome.tabs
   .getCurrent()
   .then((tab) => tab?.id)
   .catch(() => undefined);
 
-function setFeedback(message: string, isError = false) {
-  feedback.textContent = message;
+function setFeedback(
+  key: TranslationKey,
+  values: Record<string, string | number> = {},
+  isError = false,
+) {
+  feedbackKey = key;
+  feedbackValues = values;
+  feedback.textContent = translate(appLocale, key, values);
   feedback.dataset.error = String(isError);
 }
 
-function renderControllerHints(bindings: GamepadBindings) {
-  const hints: [string, string][] = [
-    [
-      `${gamepadButtonName(bindings.moveUp)}/${gamepadButtonName(bindings.moveDown)}/${gamepadButtonName(bindings.moveLeft)}/${gamepadButtonName(bindings.moveRight)}`,
-      'MOVE',
-    ],
-    [gamepadButtonName(bindings.activate), 'SELECT'],
-    [gamepadButtonName(bindings.back), 'BACK'],
-    [
-      `${gamepadButtonName(bindings.previousTab)}/${gamepadButtonName(bindings.nextTab)}`,
-      'SWITCH TABS',
-    ],
-    [
-      `${gamepadButtonName(bindings.refreshModifier)}+${gamepadButtonName(bindings.refreshTrigger)}`,
-      'REFRESH',
-    ],
-    [gamepadButtonName(bindings.newTab), 'NEW TAB'],
-    [gamepadButtonName(bindings.pause), 'PAUSE'],
-  ];
+function renderControllerStatus() {
+  const { connected, enabled } = currentControllerState;
+  controllerStatus.textContent = !connected
+    ? translate(appLocale, 'controllerConnect')
+    : !enabled
+      ? translate(appLocale, 'controllerPaused', {
+          button: gamepadButtonName(currentBindings.pause),
+        })
+      : translate(appLocale, 'controllerReadyDetails');
+}
 
-  controllerHints.replaceChildren(
-    ...hints.map(([button, action]) => {
-      const hint = document.createElement('span');
+function controllerCommands(bindings: GamepadBindings) {
+  const directions = [bindings.moveUp, bindings.moveDown, bindings.moveLeft, bindings.moveRight]
+    .map(gamepadButtonName)
+    .join('/');
+
+  return [
+    { id: 'move', buttons: `${directions} / LS`, label: 'hintMove' },
+    { id: 'scroll', buttons: 'RS ↑/↓', label: 'hintScroll' },
+    { id: 'activate', buttons: gamepadButtonName(bindings.activate), label: 'hintSelect' },
+    { id: 'back', buttons: gamepadButtonName(bindings.back), label: 'hintBack' },
+    {
+      id: 'previous-tab',
+      buttons: gamepadButtonName(bindings.previousTab),
+      label: 'hintPreviousTab',
+    },
+    { id: 'next-tab', buttons: gamepadButtonName(bindings.nextTab), label: 'hintNextTab' },
+    {
+      id: 'reload',
+      buttons: `${gamepadButtonName(bindings.refreshModifier)} + ${gamepadButtonName(bindings.refreshTrigger)}`,
+      label: 'hintRefresh',
+    },
+    { id: 'new-tab', buttons: gamepadButtonName(bindings.newTab), label: 'hintNewTab' },
+    { id: 'pause', buttons: gamepadButtonName(bindings.pause), label: 'hintPause' },
+  ] satisfies { id: string; buttons: string; label: TranslationKey }[];
+}
+
+function renderOnboardingControls() {
+  onboardingControlsCopy.textContent = translate(appLocale, 'onboardingControlsCopy', {
+    nextTab: gamepadButtonName(currentBindings.nextTab),
+    refresh: `${gamepadButtonName(currentBindings.refreshModifier)} + ${gamepadButtonName(currentBindings.refreshTrigger)}`,
+  });
+  onboardingCommands.replaceChildren(
+    ...controllerCommands(currentBindings).map(({ id, buttons, label }) => {
+      const row = document.createElement('li');
+      row.dataset.onboardingCommand = id;
       const key = document.createElement('kbd');
-      key.textContent = button;
-      hint.append(key, document.createTextNode(action));
+      key.textContent = buttons;
+      const description = document.createElement('span');
+      description.dataset.commandLabel = label;
+      description.textContent = translate(appLocale, label);
+      row.append(key, description);
+      return row;
+    }),
+  );
+}
+
+function renderControllerHints(bindings: GamepadBindings) {
+  controllerHints.setAttribute('aria-label', translate(appLocale, 'controllerHints'));
+  controllerHints.replaceChildren(
+    ...controllerCommands(bindings).map(({ buttons, label }) => {
+      const hint = document.createElement('span');
+      const keyElement = document.createElement('kbd');
+      keyElement.textContent = buttons;
+      hint.append(keyElement, document.createTextNode(translate(appLocale, label)));
       return hint;
     }),
   );
 }
 
-renderControllerHints(DEFAULT_GAMEPAD_BINDINGS);
+function setLocale(locale: AppLocale) {
+  appLocale = locale;
+  languageSelect.value = locale;
+  applyTranslations(document, locale);
+  renderControllerStatus();
+  renderControllerHints(currentBindings);
+  renderOnboardingControls();
+  renderPins();
+  renderTvModeSettings();
+  if (feedbackKey) feedback.textContent = translate(locale, feedbackKey, feedbackValues);
+}
+
+applyTranslations(document, appLocale);
+renderControllerHints(currentBindings);
+renderOnboardingControls();
+const stopLocaleWatch = watchAppLocale((locale) => {
+  languageChanged = true;
+  setLocale(locale);
+});
+void loadAppLocale().then((locale) => {
+  if (!languageChanged) setLocale(locale);
+});
+
+function setOnboardingVisible(visible: boolean) {
+  onboardingVisible = visible;
+  onboardingPanel.hidden = !visible;
+  homePanel.inert = visible;
+  if (visible) onboardingStart.focus({ preventScroll: true });
+  else {
+    const firstPin = pinGrid.querySelector<HTMLButtonElement>('[data-launch]');
+    (firstPin ?? urlInput).focus({ preventScroll: true });
+  }
+}
+
+function finishOnboarding() {
+  void completeOnboarding().then(() => setOnboardingVisible(false));
+}
+
+void loadOnboardingCompleted().then((completed) => {
+  setOnboardingVisible(!completed);
+  document.documentElement.dataset.onboardingReady = 'true';
+});
+languageSelect.addEventListener('change', () => {
+  const locale = normalizeAppLocale(languageSelect.value);
+  if (!locale) return;
+  languageChanged = true;
+  setLocale(locale);
+  void saveAppLocale(locale).catch(() => setFeedback('feedbackCouldNotSaveLanguage', {}, true));
+});
+helpLink.addEventListener('click', () => setOnboardingVisible(true));
+onboardingStart.addEventListener('click', finishOnboarding);
+onboardingSkip.addEventListener('click', finishOnboarding);
+
 let controllerHintsChanged = false;
 const onGamepadBindingsChanged = (
   changes: { [key: string]: chrome.storage.StorageChange },
@@ -99,14 +223,20 @@ const onGamepadBindingsChanged = (
   const change = changes[GAMEPAD_BINDINGS_STORAGE_KEY];
   if (areaName !== 'local' || !change) return;
   controllerHintsChanged = true;
-  renderControllerHints(normalizeGamepadBindings(change.newValue));
+  currentBindings = normalizeGamepadBindings(change.newValue);
+  renderControllerHints(currentBindings);
+  renderOnboardingControls();
 };
 try {
   chrome.storage.onChanged.addListener(onGamepadBindingsChanged);
 } catch {}
 void loadGamepadBindings()
   .then((bindings) => {
-    if (!controllerHintsChanged) renderControllerHints(bindings);
+    if (!controllerHintsChanged) {
+      currentBindings = bindings;
+      renderControllerHints(bindings);
+      renderOnboardingControls();
+    }
   })
   .catch(() => {});
 
@@ -123,15 +253,15 @@ function renderTvModeSettings() {
   tvUrlField.hidden = !hasSite || !tvModeEnabled.checked;
 
   if (!hostname) {
-    tvModeHint.textContent = 'Enter a website address to configure TV mode.';
+    tvModeHint.textContent = translate(appLocale, 'tvEnterAddress');
   } else if (!tvModeEnabled.checked) {
     tvModeHint.textContent = getBuiltInTvUrl(hostname)
-      ? 'YouTube’s built-in TV route is ready when enabled.'
-      : 'TV mode is off for this site.';
+      ? translate(appLocale, 'tvYoutubeReady')
+      : translate(appLocale, 'tvModeOff');
   } else if (tvUrlInput.value.trim()) {
-    tvModeHint.textContent = 'Every visit will open the TV landing URL.';
+    tvModeHint.textContent = translate(appLocale, 'tvEveryVisit');
   } else {
-    tvModeHint.textContent = 'Uses the Android TV WebView profile.';
+    tvModeHint.textContent = translate(appLocale, 'tvAndroidProfile');
   }
 }
 
@@ -163,7 +293,7 @@ async function syncTvModeSettings(force = false) {
     renderTvModeSettings();
   } catch {
     if (sequence !== tvProfileLoadSequence) return;
-    tvModeHint.textContent = 'Could not load this site’s TV settings.';
+    tvModeHint.textContent = translate(appLocale, 'tvCouldNotLoad');
   }
 }
 
@@ -174,7 +304,7 @@ async function saveTvModeSettings(url: string) {
 
   const tvUrl = normalizeTvUrl(tvUrlInput.value, hostname);
   if (tvUrl === null) {
-    setFeedback('The TV landing URL must use the same hostname, or be left blank.', true);
+    setFeedback('tvSameHostname', {}, true);
     tvUrlInput.focus();
     return false;
   }
@@ -189,14 +319,14 @@ async function saveTvModeSettings(url: string) {
     })) as { ok?: boolean; error?: string } | undefined;
 
     if (!response?.ok) {
-      setFeedback(response?.error ?? 'Could not save TV mode settings.', true);
+      setFeedback('tvCouldNotSave', {}, true);
       return false;
     }
 
     currentTvProfile = { hostname, enabled: tvModeEnabled.checked, tvUrl };
     return true;
   } catch {
-    setFeedback('Could not save TV mode settings.', true);
+    setFeedback('tvCouldNotSave', {}, true);
     return false;
   }
 }
@@ -227,7 +357,13 @@ function createPin(site: PinnedSite) {
   launch.type = 'button';
   launch.className = 'tile-launch';
   launch.dataset.launch = site.id;
-  launch.setAttribute('aria-label', `Open ${site.label}, ${displayHostname(site.url)}`);
+  launch.setAttribute(
+    'aria-label',
+    translate(appLocale, 'openShortcut', {
+      label: site.label,
+      host: displayHostname(site.url),
+    }),
+  );
 
   const mark = document.createElement('span');
   mark.className = 'tile-mark';
@@ -263,15 +399,18 @@ function createPin(site: PinnedSite) {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'pin-tool';
-    edit.textContent = 'Edit';
-    edit.setAttribute('aria-label', `Edit ${site.label}`);
+    edit.textContent = translate(appLocale, 'edit');
+    edit.setAttribute('aria-label', translate(appLocale, 'editShortcut', { label: site.label }));
     edit.addEventListener('click', () => editPin(site));
 
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'pin-tool';
-    remove.textContent = 'Remove';
-    remove.setAttribute('aria-label', `Remove ${site.label}`);
+    remove.textContent = translate(appLocale, 'remove');
+    remove.setAttribute(
+      'aria-label',
+      translate(appLocale, 'removeShortcut', { label: site.label }),
+    );
     remove.addEventListener('click', () => void removePin(site.id, site.label));
 
     tools.append(edit, remove);
@@ -284,16 +423,16 @@ function createPin(site: PinnedSite) {
 function renderPins(focusFirst = false) {
   pinGrid.replaceChildren(...pinnedSites.map(createPin));
   pinGrid.classList.toggle('is-editing', editingPins);
-  editPinsButton.textContent = editingPins ? 'Done' : 'Edit';
+  editPinsButton.textContent = translate(appLocale, editingPins ? 'done' : 'edit');
 
   if (!pinnedSites.length) {
     const empty = document.createElement('p');
     empty.className = 'empty-pins';
-    empty.textContent = 'No shortcuts yet. Add a website using the address bar above.';
+    empty.textContent = translate(appLocale, 'emptyShortcuts');
     pinGrid.append(empty);
   }
 
-  if (focusFirst) {
+  if (focusFirst && !onboardingVisible) {
     const firstPin = pinGrid.querySelector<HTMLButtonElement>('[data-launch]');
     if (firstPin) firstPin.focus({ preventScroll: true });
     else urlInput.focus({ preventScroll: true });
@@ -304,7 +443,7 @@ function clearPinForm() {
   editingPinId = null;
   urlInput.value = '';
   labelInput.value = '';
-  savePinButton.textContent = 'Add shortcut';
+  savePinButton.textContent = translate(appLocale, 'addShortcut');
   void syncTvModeSettings(true);
 }
 
@@ -312,8 +451,8 @@ function editPin(site: PinnedSite) {
   editingPinId = site.id;
   urlInput.value = site.url;
   labelInput.value = site.label;
-  savePinButton.textContent = 'Save changes';
-  setFeedback(`Editing ${site.label}`);
+  savePinButton.textContent = translate(appLocale, 'saveChanges');
+  setFeedback('feedbackEditingShortcut', { label: site.label });
   void syncTvModeSettings(true);
   document.querySelector('#site-form')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   urlInput.focus({ preventScroll: true });
@@ -324,26 +463,26 @@ async function removePin(id: string, label: string) {
   try {
     await savePinnedSites(nextSites);
   } catch {
-    setFeedback('Could not remove this shortcut. Please try again.', true);
+    setFeedback('feedbackCouldNotRemoveShortcut', {}, true);
     return;
   }
   pinnedSites = nextSites;
   if (editingPinId === id) clearPinForm();
   renderPins();
-  setFeedback(`${label} removed from shortcuts.`);
+  setFeedback('feedbackShortcutRemoved', { label });
 }
 
 async function savePin() {
   const url = normalizeUrl(urlInput.value);
   if (!url) {
-    setFeedback('Enter a valid HTTP or HTTPS website address.', true);
+    setFeedback('feedbackInvalidWebsite', {}, true);
     urlInput.focus();
     return;
   }
 
   const duplicate = pinnedSites.find((site) => site.url === url && site.id !== editingPinId);
   if (duplicate) {
-    setFeedback(`${duplicate.label} is already pinned.`, true);
+    setFeedback('feedbackDuplicateShortcut', { label: duplicate.label }, true);
     return;
   }
 
@@ -364,16 +503,16 @@ async function savePin() {
     pinnedSites = nextSites;
     renderPins();
     clearPinForm();
-    setFeedback(`${site.label} saved to shortcuts.`);
+    setFeedback('feedbackShortcutSaved', { label: site.label });
   } catch {
-    setFeedback('Could not save this shortcut. Please try again.', true);
+    setFeedback('feedbackCouldNotSaveShortcut', {}, true);
   }
 }
 
 async function goToAddress() {
   const url = normalizeUrl(urlInput.value);
   if (!url) {
-    setFeedback('Enter a valid HTTP or HTTPS website address.', true);
+    setFeedback('feedbackInvalidWebsite', {}, true);
     urlInput.focus();
     return;
   }
@@ -426,15 +565,10 @@ function handleGamepadAction(action: GamepadAction) {
 }
 
 function handleGamepadState(state: { connected: boolean; enabled: boolean }) {
+  currentControllerState = state;
   controllerStatus.dataset.connected = String(state.connected);
   controllerStatus.dataset.enabled = String(state.enabled);
-  if (!state.connected) {
-    controllerStatus.textContent = 'Press any controller button to connect';
-  } else if (!state.enabled) {
-    controllerStatus.textContent = 'Controller paused · Press Start to resume';
-  } else {
-    controllerStatus.textContent = 'Controller ready · D-pad move · A open · B back';
-  }
+  renderControllerStatus();
 }
 
 editPinsButton.addEventListener('click', () => {
@@ -457,7 +591,7 @@ void loadPinnedSites()
     pinnedSites = sites;
     renderPins(true);
   })
-  .catch(() => setFeedback('Could not load shortcuts from this browser profile.', true));
+  .catch(() => setFeedback('feedbackCouldNotLoadShortcuts', {}, true));
 
 const stopGamepad = startGamepadController({
   onAction: handleGamepadAction,
@@ -472,6 +606,7 @@ window.addEventListener(
     try {
       chrome.storage.onChanged.removeListener(onGamepadBindingsChanged);
     } catch {}
+    stopLocaleWatch();
   },
   { once: true },
 );

@@ -1,5 +1,9 @@
 import { isTabActionMessage } from '../lib/tab-actions';
 import {
+  ONBOARDING_COMPLETED_STORAGE_KEY,
+  onboardingCompletionAfterInstall,
+} from '../lib/onboarding';
+import {
   buildTvModeRules,
   isSaveTvModeProfileMessage,
   loadTvModeProfiles,
@@ -66,15 +70,31 @@ async function refreshAllTabs() {
   );
 }
 
+async function initializeOnboarding(reason: string) {
+  const stored = await chrome.storage.local.get(ONBOARDING_COMPLETED_STORAGE_KEY);
+  const completion = onboardingCompletionAfterInstall(
+    reason,
+    stored[ONBOARDING_COMPLETED_STORAGE_KEY],
+  );
+  if (completion !== null) {
+    await chrome.storage.local.set({ [ONBOARDING_COMPLETED_STORAGE_KEY]: completion });
+  }
+  if (reason === 'install') {
+    await chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
+  }
+}
+
 export default defineBackground(() => {
   const tabSwitchQueues = new Map<number, Promise<void>>();
   let tvModeQueue = Promise.resolve();
 
   chrome.runtime.onInstalled.addListener(({ reason }) => {
     void refreshAllTabs().catch(() => {});
-    if (reason === 'install') {
-      void chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') }).catch(() => {});
-    }
+    void initializeOnboarding(reason).catch(() => {
+      if (reason === 'install') {
+        void chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') }).catch(() => {});
+      }
+    });
     void queueTvModeReconciliation().catch(() => {});
   });
 

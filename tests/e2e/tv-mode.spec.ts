@@ -14,6 +14,11 @@ async function openNewTab(context: import('@playwright/test').BrowserContext) {
   const page = await context.newPage();
   await page.goto('chrome://newtab/');
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
+  await expect(page.locator('html')).toHaveAttribute('data-onboarding-ready', 'true');
+  if (await page.locator('#onboarding-panel').isVisible()) {
+    await page.locator('#onboarding-start').click();
+    await expect(page.locator('#onboarding-panel')).toBeHidden();
+  }
   return page;
 }
 

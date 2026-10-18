@@ -1,0 +1,555 @@
+export const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
+
+export type AppLocale = 'en' | 'pt-BR' | 'es';
+type MessageValues = Record<string, string | number>;
+
+const english = {
+  extensionName: 'Gamepad Navigator',
+  extensionDescription: 'Navigate the web with a gamepad.',
+  newTabTitle: 'Gamepad Navigator',
+  settingsTitle: 'Controller settings · Gamepad Navigator',
+  language: 'Language',
+  languageEnglish: 'English',
+  languagePortuguese: 'Português (Brasil)',
+  languageSpanish: 'Español',
+  controllerSettings: 'Controller settings',
+  backToLauncher: 'Back to launcher',
+  howToUse: 'How to use',
+  controllerConnect: 'Press any controller button to connect',
+  controllerPaused: 'Controller paused · Press {button} to resume',
+  controllerReady: 'Controller ready · See controls below',
+  controllerReadyDetails: 'Controller ready · See every command below',
+  controllerActive: 'Gamepad active · Start: pause',
+  controllerStatePaused: 'Gamepad paused · Start: resume',
+  onboardingEyebrow: 'PLAYER ONE · READY',
+  onboardingTitle: 'Welcome to Gamepad Navigator',
+  onboardingIntro: 'Your web, ready to play from the couch.',
+  onboardingConnectTitle: '1. Connect your controller',
+  onboardingConnectCopy:
+    'Connect a USB or Bluetooth controller, then press any button. You can also continue with your keyboard or mouse.',
+  onboardingControlsTitle: '2. All controller commands',
+  onboardingControlsCopy:
+    'LS is the left stick; RS is the right stick. Press {nextTab} alone for the next tab; press {refresh} together to reload.',
+  onboardingLauncherTitle: '3. Launch a site',
+  onboardingLauncherCopy:
+    'Choose a favorite or enter a web address. Focus a text field to open the floating keyboard; move to a key and press A to type.',
+  onboardingSkip: 'Skip tutorial',
+  onboardingStart: 'Start browsing',
+  homeEyebrow: 'QUICK LAUNCH · PLAYER HUB',
+  homeTitleLead: 'Choose your',
+  homeTitleAccent: 'next world.',
+  homeCopy: 'Jump into a favorite or enter a website address.',
+  addressLabel: 'Website address',
+  addressPlaceholder: 'example.com',
+  launch: 'Launch',
+  tvSettingsLabel: 'TV mode settings',
+  tvModeToggle: 'Open this site in TV mode',
+  tvUrlLabel: 'TV landing URL',
+  tvUrlPlaceholder: 'Blank uses the Android TV profile',
+  tvUrlHelp: 'Use a URL on this site. YouTube uses its built-in /tv route.',
+  shortcutNameLabel: 'Shortcut name (optional)',
+  shortcutNamePlaceholder: 'Shortcut name (optional)',
+  addShortcut: 'Add shortcut',
+  saveChanges: 'Save changes',
+  shortcutKicker: 'YOUR LIBRARY',
+  shortcutTitle: 'Quick launch',
+  shortcutCopy: 'Pick a favorite and jump back in.',
+  edit: 'Edit',
+  done: 'Done',
+  remove: 'Remove',
+  emptyShortcuts: 'No shortcuts yet. Add a website using the address bar above.',
+  openShortcut: 'Open {label}, {host}',
+  editShortcut: 'Edit {label}',
+  removeShortcut: 'Remove {label}',
+  feedbackInvalidWebsite: 'Enter a valid HTTP or HTTPS website address.',
+  feedbackDuplicateShortcut: '{label} is already pinned.',
+  feedbackEditingShortcut: 'Editing {label}',
+  feedbackShortcutRemoved: '{label} removed from shortcuts.',
+  feedbackShortcutSaved: '{label} saved to shortcuts.',
+  feedbackCouldNotSaveShortcut: 'Could not save this shortcut. Please try again.',
+  feedbackCouldNotRemoveShortcut: 'Could not remove this shortcut. Please try again.',
+  feedbackCouldNotLoadShortcuts: 'Could not load shortcuts from this browser profile.',
+  feedbackCouldNotSaveLanguage: 'Could not save the language preference.',
+  tvEnterAddress: 'Enter a website address to configure TV mode.',
+  tvYoutubeReady: 'YouTube’s built-in TV route is ready when enabled.',
+  tvModeOff: 'TV mode is off for this site.',
+  tvEveryVisit: 'Every visit will open the TV landing URL.',
+  tvAndroidProfile: 'Uses the Android TV WebView profile.',
+  tvCouldNotLoad: 'Could not load this site’s TV settings.',
+  tvSameHostname: 'The TV landing URL must use the same hostname, or be left blank.',
+  tvCouldNotSave: 'Could not save TV mode settings.',
+  hintMove: 'Move focus',
+  hintScroll: 'Scroll page',
+  hintSelect: 'Open / select',
+  hintBack: 'Go back',
+  hintPreviousTab: 'Previous tab',
+  hintNextTab: 'Next tab',
+  hintRefresh: 'Reload page',
+  hintNewTab: 'Open new tab',
+  hintPause: 'Pause / resume',
+  controllerHints: 'Controller controls',
+  settingsEyebrow: 'PLAYER PREFERENCES · CONTROLS',
+  settingsHeadingLead: 'Controller',
+  settingsHeadingAccent: 'hotkeys',
+  settingsCopy: 'Choose the controller buttons for each action. Changes apply to open pages.',
+  focusMovement: 'Focus movement',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
+  moveLeft: 'Move left',
+  moveRight: 'Move right',
+  actions: 'Actions',
+  activate: 'Activate',
+  back: 'Back',
+  previousTab: 'Previous tab',
+  nextTab: 'Next tab',
+  openNewTab: 'Open new tab',
+  pauseResume: 'Pause / resume',
+  refreshPage: 'Refresh current page',
+  refreshChordNote: 'Refresh uses a two-button combination.',
+  refreshModifierLabel: 'Refresh modifier button',
+  refreshTriggerLabel: 'Refresh trigger button',
+  analogControls: 'Analog controls',
+  analogControlsCopy: 'Left stick moves focus. The right stick scrolls the page.',
+  restoreDefaults: 'Restore defaults',
+  saveControls: 'Save controls',
+  controlsSaved: 'Controls saved.',
+  defaultsRestored: 'Default controls restored.',
+  feedbackCouldNotSaveControls: 'Could not save controller settings.',
+  feedbackCouldNotLoadControls: 'Could not load saved controls. Defaults are shown.',
+  keyboardGroup: 'Floating keyboard',
+  selectPickerTitle: 'Choose an option',
+  selectPickerHint: 'A / X: choose · B: cancel',
+  selectMultiplePickerHint: 'A / X: toggle · B: close',
+  keyboardTitle: 'Keyboard',
+  keyboardHide: 'Hide',
+  keyboardBackspace: 'Backspace',
+  keyboardShift: 'Shift',
+  keyboardClear: 'Clear',
+  keyboardSpace: 'Space',
+  keyboardEnter: 'Enter',
+  urlShortcuts: 'URL shortcuts',
+  pinnedWebsites: 'Pinned websites',
+  buttonFallback: 'Button {button}',
+  buttonSouth: 'A / South',
+  buttonEast: 'B / East',
+  buttonWest: 'X / West',
+  buttonNorth: 'Y / North',
+  buttonLeftBumper: 'LB / L1',
+  buttonRightBumper: 'RB / R1',
+  buttonLeftTrigger: 'LT / L2',
+  buttonRightTrigger: 'RT / R2',
+  buttonSelect: 'Select / View',
+  buttonStart: 'Start / Menu',
+  buttonLeftStick: 'L3 / Left stick',
+  buttonRightStick: 'R3 / Right stick',
+  buttonDpadUp: 'D-pad up',
+  buttonDpadDown: 'D-pad down',
+  buttonDpadLeft: 'D-pad left',
+  buttonDpadRight: 'D-pad right',
+} as const;
+
+export type TranslationKey = keyof typeof english;
+
+const portuguese: Record<TranslationKey, string> = {
+  extensionName: 'Gamepad Navigator',
+  extensionDescription: 'Navegue na web com um controle.',
+  newTabTitle: 'Gamepad Navigator',
+  settingsTitle: 'Configurações do controle · Gamepad Navigator',
+  language: 'Idioma',
+  languageEnglish: 'English',
+  languagePortuguese: 'Português (Brasil)',
+  languageSpanish: 'Español',
+  controllerSettings: 'Configurações do controle',
+  backToLauncher: 'Voltar ao launcher',
+  howToUse: 'Como usar',
+  controllerConnect: 'Pressione qualquer botão do controle para conectar',
+  controllerPaused: 'Controle pausado · Pressione {button} para retomar',
+  controllerReady: 'Controle pronto · Veja os comandos abaixo',
+  controllerReadyDetails: 'Controle pronto · Veja todos os comandos abaixo',
+  controllerActive: 'Controle ativo · Start: pausar',
+  controllerStatePaused: 'Controle pausado · Start: retomar',
+  onboardingEyebrow: 'JOGADOR 1 · PREPARADO',
+  onboardingTitle: 'Boas-vindas ao Gamepad Navigator',
+  onboardingIntro: 'Sua web pronta para jogar do sofá.',
+  onboardingConnectTitle: '1. Conecte seu controle',
+  onboardingConnectCopy:
+    'Conecte um controle USB ou Bluetooth e pressione qualquer botão. Você também pode continuar com teclado ou mouse.',
+  onboardingControlsTitle: '2. Todos os comandos do controle',
+  onboardingControlsCopy:
+    'LS é o analógico esquerdo; RS, o direito. Pressione {nextTab} sozinho para ir à próxima aba; pressione {refresh} junto para recarregar.',
+  onboardingLauncherTitle: '3. Abra um site',
+  onboardingLauncherCopy:
+    'Escolha um favorito ou digite um endereço. Foque um campo de texto para abrir o teclado flutuante; navegue até uma tecla e pressione A para digitar.',
+  onboardingSkip: 'Pular tutorial',
+  onboardingStart: 'Começar a navegar',
+  homeEyebrow: 'ACESSO RÁPIDO · CENTRAL DO JOGADOR',
+  homeTitleLead: 'Escolha seu',
+  homeTitleAccent: 'próximo mundo.',
+  homeCopy: 'Abra um favorito ou digite o endereço de um site.',
+  addressLabel: 'Endereço do site',
+  addressPlaceholder: 'exemplo.com.br',
+  launch: 'Abrir',
+  tvSettingsLabel: 'Configurações do modo TV',
+  tvModeToggle: 'Abrir este site no modo TV',
+  tvUrlLabel: 'Endereço inicial da TV',
+  tvUrlPlaceholder: 'Em branco, usa o perfil Android TV',
+  tvUrlHelp: 'Use um endereço deste site. O YouTube usa a rota /tv.',
+  shortcutNameLabel: 'Nome do atalho (opcional)',
+  shortcutNamePlaceholder: 'Nome do atalho (opcional)',
+  addShortcut: 'Adicionar atalho',
+  saveChanges: 'Salvar alterações',
+  shortcutKicker: 'SUA BIBLIOTECA',
+  shortcutTitle: 'Acesso rápido',
+  shortcutCopy: 'Escolha um favorito e continue de onde parou.',
+  edit: 'Editar',
+  done: 'Concluir',
+  remove: 'Remover',
+  emptyShortcuts: 'Nenhum atalho ainda. Adicione um site pelo campo de endereço.',
+  openShortcut: 'Abrir {label}, {host}',
+  editShortcut: 'Editar {label}',
+  removeShortcut: 'Remover {label}',
+  feedbackInvalidWebsite: 'Digite um endereço HTTP ou HTTPS válido.',
+  feedbackDuplicateShortcut: '{label} já está nos atalhos.',
+  feedbackEditingShortcut: 'Editando {label}',
+  feedbackShortcutRemoved: '{label} removido dos atalhos.',
+  feedbackShortcutSaved: '{label} salvo nos atalhos.',
+  feedbackCouldNotSaveShortcut: 'Não foi possível salvar o atalho. Tente novamente.',
+  feedbackCouldNotRemoveShortcut: 'Não foi possível remover o atalho. Tente novamente.',
+  feedbackCouldNotLoadShortcuts: 'Não foi possível carregar os atalhos deste perfil.',
+  feedbackCouldNotSaveLanguage: 'Não foi possível salvar o idioma.',
+  tvEnterAddress: 'Digite um endereço para configurar o modo TV.',
+  tvYoutubeReady: 'A rota de TV do YouTube está pronta para ser ativada.',
+  tvModeOff: 'O modo TV está desativado para este site.',
+  tvEveryVisit: 'Todas as visitas abrirão o endereço inicial de TV.',
+  tvAndroidProfile: 'Usa o perfil Android TV WebView.',
+  tvCouldNotLoad: 'Não foi possível carregar as configurações de TV deste site.',
+  tvSameHostname: 'O endereço de TV precisa usar o mesmo domínio ou ficar em branco.',
+  tvCouldNotSave: 'Não foi possível salvar as configurações do modo TV.',
+  hintMove: 'Mover foco',
+  hintScroll: 'Rolar a página',
+  hintSelect: 'Abrir / selecionar',
+  hintBack: 'Voltar',
+  hintPreviousTab: 'Aba anterior',
+  hintNextTab: 'Próxima aba',
+  hintRefresh: 'Recarregar página',
+  hintNewTab: 'Abrir nova aba',
+  hintPause: 'Pausar / retomar',
+  controllerHints: 'Comandos do controle',
+  settingsEyebrow: 'PREFERÊNCIAS DO JOGADOR · CONTROLES',
+  settingsHeadingLead: 'Atalhos do',
+  settingsHeadingAccent: 'controle',
+  settingsCopy:
+    'Escolha os botões do controle para cada ação. As mudanças valem nas páginas abertas.',
+  focusMovement: 'Movimento do foco',
+  moveUp: 'Mover para cima',
+  moveDown: 'Mover para baixo',
+  moveLeft: 'Mover para a esquerda',
+  moveRight: 'Mover para a direita',
+  actions: 'Ações',
+  activate: 'Selecionar',
+  back: 'Voltar',
+  previousTab: 'Aba anterior',
+  nextTab: 'Próxima aba',
+  openNewTab: 'Abrir nova aba',
+  pauseResume: 'Pausar / retomar',
+  refreshPage: 'Atualizar página atual',
+  refreshChordNote: 'A atualização usa a combinação de dois botões.',
+  refreshModifierLabel: 'Botão modificador de atualização',
+  refreshTriggerLabel: 'Botão de atualização',
+  analogControls: 'Controles analógicos',
+  analogControlsCopy: 'O analógico esquerdo move o foco. O direito rola a página.',
+  restoreDefaults: 'Restaurar padrões',
+  saveControls: 'Salvar controles',
+  controlsSaved: 'Controles salvos.',
+  defaultsRestored: 'Controles padrão restaurados.',
+  feedbackCouldNotSaveControls: 'Não foi possível salvar as configurações do controle.',
+  feedbackCouldNotLoadControls: 'Não foi possível carregar os controles. Exibindo padrões.',
+  keyboardGroup: 'Teclado flutuante',
+  selectPickerTitle: 'Escolha uma opção',
+  selectPickerHint: 'A / X: escolher · B: cancelar',
+  selectMultiplePickerHint: 'A / X: marcar · B: fechar',
+  keyboardTitle: 'Teclado',
+  keyboardHide: 'Ocultar',
+  keyboardBackspace: 'Apagar',
+  keyboardShift: 'Maiúsculas',
+  keyboardClear: 'Limpar',
+  keyboardSpace: 'Espaço',
+  keyboardEnter: 'Enter',
+  urlShortcuts: 'Atalhos de endereço',
+  pinnedWebsites: 'Sites favoritos',
+  buttonFallback: 'Botão {button}',
+  buttonSouth: 'A / inferior',
+  buttonEast: 'B / direita',
+  buttonWest: 'X / esquerda',
+  buttonNorth: 'Y / superior',
+  buttonLeftBumper: 'LB / L1',
+  buttonRightBumper: 'RB / R1',
+  buttonLeftTrigger: 'LT / L2',
+  buttonRightTrigger: 'RT / R2',
+  buttonSelect: 'Select / View',
+  buttonStart: 'Start / Menu',
+  buttonLeftStick: 'L3 / analógico esquerdo',
+  buttonRightStick: 'R3 / analógico direito',
+  buttonDpadUp: 'Direcional para cima',
+  buttonDpadDown: 'Direcional para baixo',
+  buttonDpadLeft: 'Direcional para a esquerda',
+  buttonDpadRight: 'Direcional para a direita',
+};
+
+const spanish: Record<TranslationKey, string> = {
+  extensionName: 'Gamepad Navigator',
+  extensionDescription: 'Navega por la web con un mando.',
+  newTabTitle: 'Gamepad Navigator',
+  settingsTitle: 'Ajustes del mando · Gamepad Navigator',
+  language: 'Idioma',
+  languageEnglish: 'English',
+  languagePortuguese: 'Português (Brasil)',
+  languageSpanish: 'Español',
+  controllerSettings: 'Ajustes del mando',
+  backToLauncher: 'Volver al launcher',
+  howToUse: 'Cómo usarlo',
+  controllerConnect: 'Pulsa cualquier botón del mando para conectarlo',
+  controllerPaused: 'Mando en pausa · Pulsa {button} para continuar',
+  controllerReady: 'Mando listo · Consulta los controles abajo',
+  controllerReadyDetails: 'Mando listo · Consulta todos los comandos abajo',
+  controllerActive: 'Mando activo · Start: pausar',
+  controllerStatePaused: 'Mando en pausa · Start: continuar',
+  onboardingEyebrow: 'JUGADOR 1 · LISTO',
+  onboardingTitle: 'Te damos la bienvenida a Gamepad Navigator',
+  onboardingIntro: 'La web, lista para jugar desde el sofá.',
+  onboardingConnectTitle: '1. Conecta tu mando',
+  onboardingConnectCopy:
+    'Conecta un mando USB o Bluetooth y pulsa cualquier botón. También puedes continuar con teclado o ratón.',
+  onboardingControlsTitle: '2. Todos los comandos del mando',
+  onboardingControlsCopy:
+    'LS es el stick izquierdo; RS, el derecho. Pulsa {nextTab} por separado para ir a la pestaña siguiente; pulsa {refresh} a la vez para recargar.',
+  onboardingLauncherTitle: '3. Abre un sitio',
+  onboardingLauncherCopy:
+    'Elige un favorito o escribe una dirección web. Enfoca un campo de texto para abrir el teclado flotante; mueve el foco a una tecla y pulsa A para escribir.',
+  onboardingSkip: 'Saltar tutorial',
+  onboardingStart: 'Empezar a navegar',
+  homeEyebrow: 'ACCESO RÁPIDO · CENTRO DEL JUGADOR',
+  homeTitleLead: 'Elige tu',
+  homeTitleAccent: 'próximo mundo.',
+  homeCopy: 'Abre un favorito o escribe una dirección web.',
+  addressLabel: 'Dirección del sitio',
+  addressPlaceholder: 'ejemplo.com',
+  launch: 'Abrir',
+  tvSettingsLabel: 'Ajustes del modo TV',
+  tvModeToggle: 'Abrir este sitio en modo TV',
+  tvUrlLabel: 'Dirección de inicio en TV',
+  tvUrlPlaceholder: 'En blanco, usa el perfil Android TV',
+  tvUrlHelp: 'Usa una dirección de este sitio. YouTube usa la ruta /tv.',
+  shortcutNameLabel: 'Nombre del acceso (opcional)',
+  shortcutNamePlaceholder: 'Nombre del acceso (opcional)',
+  addShortcut: 'Añadir acceso',
+  saveChanges: 'Guardar cambios',
+  shortcutKicker: 'TU BIBLIOTECA',
+  shortcutTitle: 'Acceso rápido',
+  shortcutCopy: 'Elige un favorito y vuelve a entrar.',
+  edit: 'Editar',
+  done: 'Listo',
+  remove: 'Quitar',
+  emptyShortcuts: 'Aún no hay accesos. Añade un sitio desde la barra de dirección.',
+  openShortcut: 'Abrir {label}, {host}',
+  editShortcut: 'Editar {label}',
+  removeShortcut: 'Quitar {label}',
+  feedbackInvalidWebsite: 'Escribe una dirección HTTP o HTTPS válida.',
+  feedbackDuplicateShortcut: '{label} ya está guardado.',
+  feedbackEditingShortcut: 'Editando {label}',
+  feedbackShortcutRemoved: '{label} se quitó de los accesos.',
+  feedbackShortcutSaved: '{label} se guardó en los accesos.',
+  feedbackCouldNotSaveShortcut: 'No se pudo guardar el acceso. Inténtalo de nuevo.',
+  feedbackCouldNotRemoveShortcut: 'No se pudo quitar el acceso. Inténtalo de nuevo.',
+  feedbackCouldNotLoadShortcuts: 'No se pudieron cargar los accesos de este perfil.',
+  feedbackCouldNotSaveLanguage: 'No se pudo guardar el idioma.',
+  tvEnterAddress: 'Escribe una dirección para configurar el modo TV.',
+  tvYoutubeReady: 'La ruta de TV de YouTube estará lista al activarla.',
+  tvModeOff: 'El modo TV está desactivado para este sitio.',
+  tvEveryVisit: 'Todas las visitas abrirán la dirección de inicio en TV.',
+  tvAndroidProfile: 'Usa el perfil Android TV WebView.',
+  tvCouldNotLoad: 'No se pudieron cargar los ajustes de TV de este sitio.',
+  tvSameHostname: 'La dirección de TV debe usar el mismo dominio o quedar en blanco.',
+  tvCouldNotSave: 'No se pudieron guardar los ajustes del modo TV.',
+  hintMove: 'Mover foco',
+  hintScroll: 'Desplazar página',
+  hintSelect: 'Abrir / seleccionar',
+  hintBack: 'Volver',
+  hintPreviousTab: 'Pestaña anterior',
+  hintNextTab: 'Pestaña siguiente',
+  hintRefresh: 'Recargar página',
+  hintNewTab: 'Abrir pestaña nueva',
+  hintPause: 'Pausar / reanudar',
+  controllerHints: 'Controles del mando',
+  settingsEyebrow: 'PREFERENCIAS DEL JUGADOR · CONTROLES',
+  settingsHeadingLead: 'Atajos del',
+  settingsHeadingAccent: 'mando',
+  settingsCopy:
+    'Elige los botones del mando para cada acción. Los cambios se aplican a las páginas abiertas.',
+  focusMovement: 'Movimiento del foco',
+  moveUp: 'Mover arriba',
+  moveDown: 'Mover abajo',
+  moveLeft: 'Mover a la izquierda',
+  moveRight: 'Mover a la derecha',
+  actions: 'Acciones',
+  activate: 'Seleccionar',
+  back: 'Volver',
+  previousTab: 'Pestaña anterior',
+  nextTab: 'Pestaña siguiente',
+  openNewTab: 'Abrir pestaña nueva',
+  pauseResume: 'Pausar / continuar',
+  refreshPage: 'Actualizar página actual',
+  refreshChordNote: 'Actualizar usa una combinación de dos botones.',
+  refreshModifierLabel: 'Botón modificador para actualizar',
+  refreshTriggerLabel: 'Botón para actualizar',
+  analogControls: 'Controles analógicos',
+  analogControlsCopy: 'El stick izquierdo mueve el foco. El derecho desplaza la página.',
+  restoreDefaults: 'Restaurar valores predeterminados',
+  saveControls: 'Guardar controles',
+  controlsSaved: 'Controles guardados.',
+  defaultsRestored: 'Se restauraron los controles predeterminados.',
+  feedbackCouldNotSaveControls: 'No se pudieron guardar los ajustes del mando.',
+  feedbackCouldNotLoadControls:
+    'No se pudieron cargar los controles. Se muestran los predeterminados.',
+  keyboardGroup: 'Teclado flotante',
+  selectPickerTitle: 'Elige una opción',
+  selectPickerHint: 'A / X: elegir · B: cancelar',
+  selectMultiplePickerHint: 'A / X: marcar · B: cerrar',
+  keyboardTitle: 'Teclado',
+  keyboardHide: 'Ocultar',
+  keyboardBackspace: 'Borrar',
+  keyboardShift: 'Mayúsculas',
+  keyboardClear: 'Limpiar',
+  keyboardSpace: 'Espacio',
+  keyboardEnter: 'Enter',
+  urlShortcuts: 'Atajos de dirección',
+  pinnedWebsites: 'Sitios guardados',
+  buttonFallback: 'Botón {button}',
+  buttonSouth: 'A / sur',
+  buttonEast: 'B / este',
+  buttonWest: 'X / oeste',
+  buttonNorth: 'Y / norte',
+  buttonLeftBumper: 'LB / L1',
+  buttonRightBumper: 'RB / R1',
+  buttonLeftTrigger: 'LT / L2',
+  buttonRightTrigger: 'RT / R2',
+  buttonSelect: 'Select / View',
+  buttonStart: 'Start / Menu',
+  buttonLeftStick: 'L3 / stick izquierdo',
+  buttonRightStick: 'R3 / stick derecho',
+  buttonDpadUp: 'Cruceta arriba',
+  buttonDpadDown: 'Cruceta abajo',
+  buttonDpadLeft: 'Cruceta izquierda',
+  buttonDpadRight: 'Cruceta derecha',
+};
+
+const translations: Record<AppLocale, Record<TranslationKey, string>> = {
+  en: english,
+  'pt-BR': portuguese,
+  es: spanish,
+};
+
+const buttonLabelKeys: TranslationKey[] = [
+  'buttonSouth',
+  'buttonEast',
+  'buttonWest',
+  'buttonNorth',
+  'buttonLeftBumper',
+  'buttonRightBumper',
+  'buttonLeftTrigger',
+  'buttonRightTrigger',
+  'buttonSelect',
+  'buttonStart',
+  'buttonLeftStick',
+  'buttonRightStick',
+  'buttonDpadUp',
+  'buttonDpadDown',
+  'buttonDpadLeft',
+  'buttonDpadRight',
+];
+
+export function normalizeAppLocale(value: unknown): AppLocale | null {
+  return value === 'en' || value === 'pt-BR' || value === 'es' ? value : null;
+}
+
+export function detectAppLocale(locales: readonly string[] = navigator.languages): AppLocale {
+  for (const locale of locales) {
+    const language = locale.toLowerCase().split(/[-_]/)[0];
+    if (language === 'pt') return 'pt-BR';
+    if (language === 'es') return 'es';
+    if (language === 'en') return 'en';
+  }
+  return 'en';
+}
+
+export function translate(
+  locale: AppLocale,
+  key: TranslationKey,
+  values: MessageValues = {},
+): string {
+  return translations[locale][key].replace(/\{(\w+)\}/g, (_, name: string) =>
+    String(values[name] ?? ''),
+  );
+}
+
+export function gamepadButtonLabel(locale: AppLocale, button: number): string {
+  const key = buttonLabelKeys[button];
+  return key ? translate(locale, key) : translate(locale, 'buttonFallback', { button });
+}
+
+export async function loadAppLocale(): Promise<AppLocale> {
+  try {
+    const stored = await chrome.storage.local.get(APP_LANGUAGE_STORAGE_KEY);
+    return normalizeAppLocale(stored[APP_LANGUAGE_STORAGE_KEY]) ?? detectAppLocale();
+  } catch {
+    return detectAppLocale();
+  }
+}
+
+export async function saveAppLocale(locale: AppLocale): Promise<void> {
+  await chrome.storage.local.set({ [APP_LANGUAGE_STORAGE_KEY]: locale });
+}
+
+export function watchAppLocale(onChange: (locale: AppLocale) => void): () => void {
+  const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+    const change = changes[APP_LANGUAGE_STORAGE_KEY];
+    const locale = normalizeAppLocale(change?.newValue);
+    if (areaName === 'local' && change && locale) onChange(locale);
+  };
+
+  try {
+    chrome.storage.onChanged.addListener(listener);
+  } catch {
+    return () => {};
+  }
+
+  return () => {
+    try {
+      chrome.storage.onChanged.removeListener(listener);
+    } catch {}
+  };
+}
+
+export function applyTranslations(root: ParentNode, locale: AppLocale): void {
+  const selector =
+    '[data-i18n], [data-i18n-placeholder], [data-i18n-aria-label], [data-i18n-title]';
+  const elements = [...root.querySelectorAll<HTMLElement>(selector)];
+  if (root instanceof HTMLElement && root.matches(selector)) elements.unshift(root);
+
+  for (const element of elements) {
+    const key = element.dataset.i18n as TranslationKey | undefined;
+    if (key) element.textContent = translate(locale, key);
+    const placeholder = element.dataset.i18nPlaceholder as TranslationKey | undefined;
+    if (placeholder) element.setAttribute('placeholder', translate(locale, placeholder));
+    const ariaLabel = element.dataset.i18nAriaLabel as TranslationKey | undefined;
+    if (ariaLabel) element.setAttribute('aria-label', translate(locale, ariaLabel));
+    const title = element.dataset.i18nTitle as TranslationKey | undefined;
+    if (title) element.setAttribute('title', translate(locale, title));
+  }
+
+  if (root instanceof Document) {
+    root.documentElement.lang = locale;
+    const titleKey = root.documentElement.dataset.i18nPageTitle as TranslationKey | undefined;
+    if (titleKey) root.title = translate(locale, titleKey);
+  }
+}

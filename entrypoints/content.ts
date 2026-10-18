@@ -1,7 +1,15 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
 import { attachFloatingKeyboard } from '../lib/floating-keyboard';
+import { createSelectPicker } from '../lib/select-picker';
 import { sendTabAction } from '../lib/tab-actions';
+import {
+  detectAppLocale,
+  loadAppLocale,
+  translate,
+  watchAppLocale,
+  type AppLocale,
+} from '../lib/i18n';
 
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
@@ -11,7 +19,10 @@ export default defineContentScript({
     if (window !== window.top) return;
     let enabled = true;
     let connected = false;
+    let appLocale: AppLocale = detectAppLocale();
+    let languageChanged = false;
     let selected: HTMLElement | null = null;
+    let activeSelectPicker: HTMLDialogElement | null = null;
     let frame = 0;
 
     const outline = document.createElement('div');
@@ -44,7 +55,24 @@ export default defineContentScript({
       pointerEvents: 'none',
       display: 'none',
     });
-    status.textContent = 'Gamepad ativo · Start: pausar';
+    function renderStatus() {
+      status.textContent = translate(
+        appLocale,
+        enabled ? 'controllerActive' : 'controllerStatePaused',
+      );
+    }
+
+    renderStatus();
+    const stopLocaleWatch = watchAppLocale((locale) => {
+      languageChanged = true;
+      appLocale = locale;
+      renderStatus();
+    });
+    void loadAppLocale().then((locale) => {
+      if (languageChanged) return;
+      appLocale = locale;
+      renderStatus();
+    });
     document.documentElement.appendChild(status);
 
     const stopFloatingKeyboard = attachFloatingKeyboard();
@@ -96,6 +124,15 @@ export default defineContentScript({
     function move(direction: Direction) {
       if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
         selected = document.activeElement;
+      if (activeSelectPicker?.open) {
+        const target = nearest(selected, direction);
+        if (target) {
+          selected = target;
+          target.focus({ preventScroll: true });
+          draw();
+        }
+        return;
+      }
       const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
       if (
         direction === 'down' &&
@@ -126,16 +163,42 @@ export default defineContentScript({
       }
     }
 
+    function openSelectPicker(select: HTMLSelectElement) {
+      const picker = createSelectPicker(select, appLocale);
+      if (!picker) return;
+      activeSelectPicker = picker;
+      picker.addEventListener(
+        'close',
+        () => {
+          if (activeSelectPicker === picker) activeSelectPicker = null;
+          if (select.isConnected) {
+            selected = select;
+            select.focus({ preventScroll: true });
+          } else selected = candidates()[0] ?? null;
+          draw();
+        },
+        { once: true },
+      );
+      document.body.append(picker);
+      picker.showModal();
+      const selectedOption = picker.querySelector<HTMLButtonElement>(
+        `[data-option-index="${select.selectedIndex}"]`,
+      );
+      const firstEnabledOption = picker.querySelector<HTMLButtonElement>('button:not(:disabled)');
+      const initialOption =
+        selectedOption && !selectedOption.disabled ? selectedOption : firstEnabledOption;
+      if (initialOption) {
+        selected = initialOption;
+        initialOption.focus({ preventScroll: true });
+      }
+    }
+
     function activate() {
       if (!selected || !selected.isConnected) return;
-      selected.focus({ preventScroll: true });
-      if (selected instanceof HTMLInputElement && ['checkbox', 'radio'].includes(selected.type)) {
-        selected.click();
-      } else if (selected instanceof HTMLSelectElement) {
-        selected.focus();
-      } else {
-        selected.click();
-      }
+      const target = selected;
+      target.focus({ preventScroll: true });
+      target.click();
+      if (target instanceof HTMLSelectElement && target.isConnected) openSelectPicker(target);
     }
 
     selected = candidates()[0] ?? null;
@@ -146,8 +209,10 @@ export default defineContentScript({
         if (action.type === 'move') move(action.direction);
         else if (action.type === 'scroll') window.scrollBy(0, action.amount);
         else if (action.type === 'activate') activate();
-        else if (action.type === 'back') sendTabAction('back');
-        else if (action.type === 'refresh') window.location.reload();
+        else if (action.type === 'back') {
+          if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
+          else sendTabAction('back');
+        } else if (action.type === 'refresh') window.location.reload();
         else if (action.type === 'previous-tab') sendTabAction('prev-tab');
         else if (action.type === 'next-tab') sendTabAction('next-tab');
         else if (action.type === 'new-tab') sendTabAction('new-tab');
@@ -162,9 +227,7 @@ export default defineContentScript({
           draw();
           return;
         }
-        status.textContent = state.enabled
-          ? 'Gamepad ativo · Start: pausar'
-          : 'Gamepad pausado · Start: retomar';
+        renderStatus();
         status.style.display = 'block';
         draw();
       },
@@ -174,7 +237,9 @@ export default defineContentScript({
       'pagehide',
       () => {
         stopGamepad();
+        if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
         cancelAnimationFrame(frame);
+        stopLocaleWatch();
         outline.remove();
         status.remove();
         stopFloatingKeyboard();

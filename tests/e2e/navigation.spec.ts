@@ -28,6 +28,28 @@ const textFixtureHtml = `<!doctype html>
   </body>
 </html>`;
 
+const selectFixtureHtml = `<!doctype html>
+<html>
+  <body>
+    <label for="choice">Favorite flavor</label>
+    <select id="choice" onclick="document.body.dataset.selectClicked = 'true'">
+      <option value="vanilla">Vanilla</option>
+      <option value="chocolate">Chocolate</option>
+    </select>
+    <label for="toppings">Favorite toppings</label>
+    <select id="toppings" multiple>
+      <option value="cheese">Cheese</option>
+      <option value="olive">Olive</option>
+    </select>
+    <button id="other" onclick="document.body.dataset.activated = 'other'">Other control</button>
+    <script>
+      document.querySelector('#choice').addEventListener('change', (event) => {
+        document.body.dataset.choice = event.target.value;
+      });
+    </script>
+  </body>
+</html>`;
+
 function makeFrame(pressed: number[] = [], axes: number[] = [0, 0, 0, 0]): GamepadFrame {
   return {
     id: 'E2E standard gamepad',
@@ -80,19 +102,86 @@ async function connectPad(page: Page) {
   await expect(status).toBeAttached();
   await sendFrame(page, makeFrame(), true);
   await expect(status).toBeVisible();
-  await expect(status).toHaveText('Gamepad ativo · Start: pausar');
+  await expect(status).toHaveText('Gamepad active · Start: pause');
   return status;
 }
 
 test.beforeEach(async ({ context }) => {
   await context.route(/^https?:\/\/(alpha|beta)\.test\//, (route) => {
-    const isTextFixture = new URL(route.request().url()).pathname === '/text-fields';
+    const path = new URL(route.request().url()).pathname;
     return route.fulfill({
       status: 200,
       contentType: 'text/html',
-      body: isTextFixture ? textFixtureHtml : fixtureHtml,
+      body:
+        path === '/text-fields'
+          ? textFixtureHtml
+          : path === '/form-controls'
+            ? selectFixtureHtml
+            : fixtureHtml,
     });
   });
+});
+
+test('opens and selects native select options with the gamepad', async ({ page }) => {
+  await page.goto('https://alpha.test/form-controls');
+  await connectPad(page);
+
+  const choice = page.locator('#choice');
+  await choice.focus();
+  await sendFrame(page, makeFrame([0]), true);
+
+  const picker = page.getByRole('dialog', { name: 'Favorite flavor' });
+  const vanilla = picker.getByRole('option', { name: 'Vanilla' });
+  const chocolate = picker.getByRole('option', { name: 'Chocolate' });
+  await expect(picker).toBeVisible();
+  await expect(vanilla).toBeFocused();
+  await sendFrame(page, makeFrame(), true);
+  await sendFrame(page, makeFrame([13]), true);
+  await sendFrame(page, makeFrame(), true);
+  await expect(chocolate).toBeFocused();
+  await sendFrame(page, makeFrame([0]), true);
+
+  await expect(picker).toBeHidden();
+  await expect(choice).toHaveValue('chocolate');
+  await expect(page.locator('body')).toHaveAttribute('data-select-clicked', 'true');
+  await expect(page.locator('body')).toHaveAttribute('data-choice', 'chocolate');
+  await expect(choice).toBeFocused();
+});
+
+test('B cancels the select picker without leaving the current page', async ({ page }) => {
+  await page.goto('https://alpha.test/form-controls');
+  await connectPad(page);
+
+  const choice = page.locator('#choice');
+  await choice.focus();
+  await sendFrame(page, makeFrame([0]), true);
+  await expect(page.getByRole('dialog', { name: 'Favorite flavor' })).toBeVisible();
+  await sendFrame(page, makeFrame(), true);
+  await sendFrame(page, makeFrame([1]), true);
+
+  await expect(page.getByRole('dialog', { name: 'Favorite flavor' })).toBeHidden();
+  await expect(choice).toBeFocused();
+  await expect(choice).toHaveValue('vanilla');
+  await expect(page).toHaveURL('https://alpha.test/form-controls');
+});
+
+test('A/X toggles multiple select options and B closes the picker', async ({ page }) => {
+  await page.goto('https://alpha.test/form-controls');
+  await connectPad(page);
+
+  const toppings = page.locator('#toppings');
+  await toppings.focus();
+  await sendFrame(page, makeFrame([0]), true);
+  const picker = page.getByRole('dialog', { name: 'Favorite toppings' });
+  await expect(picker).toBeVisible();
+  await sendFrame(page, makeFrame(), true);
+  await sendFrame(page, makeFrame([0]), true);
+  await sendFrame(page, makeFrame(), true);
+  await sendFrame(page, makeFrame([1]), true);
+
+  await expect(picker).toBeHidden();
+  await expect(toppings).toHaveValues(['cheese']);
+  await expect(page).toHaveURL('https://alpha.test/form-controls');
 });
 
 test('shows a floating keyboard for text inputs and textareas', async ({ page }) => {
@@ -171,6 +260,28 @@ test('keeps directional focus inside the floating keyboard', async ({ page }) =>
       ),
     )
     .toBe(true);
+});
+
+test('keeps the floating keyboard navigable from a modal text field', async ({ page }) => {
+  await page.goto('https://alpha.test/text-fields');
+  await connectPad(page);
+  await page.evaluate(() => {
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.style.cssText =
+      'position:fixed;left:0;top:0;margin:0;padding:0;border:0;width:420px;height:80px;';
+    dialog.innerHTML = '<input id="modal-input" type="text">';
+    document.body.append(dialog);
+    document.querySelector<HTMLInputElement>('#modal-input')?.focus();
+  });
+
+  const keyboard = page.locator('[data-gamepad-navigator="keyboard"]');
+  const keys = keyboard.locator('[data-key]');
+  await expect(keyboard).toBeVisible();
+  await keys.first().focus();
+  await sendFrame(page, makeFrame([15]), true);
+  await expect(keys.nth(1)).toBeFocused();
 });
 
 test('hiding the floating keyboard returns focus to its text field', async ({ page }) => {
@@ -259,6 +370,74 @@ test('moves focus and activates controls across supported sites', async ({ page 
   }
 });
 
+test('keeps directional focus inside an open native dialog', async ({ page }) => {
+  await page.goto('https://alpha.test/controls');
+  await connectPad(page);
+  await page.evaluate(() => {
+    const dialog = document.createElement('dialog');
+    dialog.id = 'game-dialog';
+    dialog.style.cssText =
+      'position:fixed;left:0;top:0;margin:0;padding:0;border:0;width:420px;height:80px;';
+    dialog.innerHTML =
+      '<button id="dialog-first" style="left:20px;top:20px">First</button>' +
+      '<button id="dialog-next" style="left:220px;top:20px">Next</button>';
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+
+  const next = page.locator('#dialog-next');
+  await expect(page.locator('#dialog-first')).toBeFocused();
+  await sendFrame(page, makeFrame([15]), true);
+  await expect(next).toBeFocused();
+});
+
+test('keeps directional focus inside an ARIA modal', async ({ page }) => {
+  await page.goto('https://alpha.test/controls');
+  await connectPad(page);
+  await page.evaluate(() => {
+    const dialog = document.createElement('div');
+    dialog.id = 'aria-dialog';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.style.cssText =
+      'position:fixed;left:0;top:0;margin:0;padding:0;border:0;width:420px;height:80px;';
+    dialog.innerHTML =
+      '<button id="aria-first" style="left:20px;top:20px">First</button>' +
+      '<button id="aria-next" style="left:220px;top:20px">Next</button>';
+    document.body.append(dialog);
+    document.querySelector<HTMLElement>('#aria-first')?.focus();
+  });
+
+  const next = page.locator('#aria-next');
+  await expect(page.locator('#aria-first')).toBeFocused();
+  await sendFrame(page, makeFrame([15]), true);
+  await expect(next).toBeFocused();
+});
+
+test('finds menu items inside an open popover', async ({ page }) => {
+  await page.goto('https://alpha.test/controls');
+  await connectPad(page);
+  await page.evaluate(() => {
+    const popover = document.createElement('div');
+    popover.id = 'game-menu';
+    popover.setAttribute('popover', 'manual');
+    popover.setAttribute('role', 'menu');
+    popover.style.cssText =
+      'position:fixed;left:0;top:0;margin:0;padding:0;border:0;width:420px;height:80px;';
+    popover.innerHTML =
+      '<div id="menu-first" role="menuitem" tabindex="-1" style="position:fixed;left:20px;top:20px;width:100px;height:40px">First</div>' +
+      '<div id="menu-next" role="menuitem" tabindex="-1" style="position:fixed;left:220px;top:20px;width:100px;height:40px">Next</div>';
+    document.body.append(popover);
+    popover.showPopover();
+    document.querySelector<HTMLElement>('#menu-first')?.focus();
+  });
+
+  const next = page.locator('#menu-next');
+  await expect(page.locator('#menu-first')).toBeFocused();
+  await sendFrame(page, makeFrame([15]), true);
+  await expect(next).toBeFocused();
+});
+
 test('moves immediately after a gamepad reconnects', async ({ page }) => {
   await page.goto('https://alpha.test/controls');
   const status = await connectPad(page);
@@ -279,7 +458,7 @@ test('Start blocks navigation and activation until resumed', async ({ page }) =>
   await sendFrame(page, makeFrame(), true);
 
   await sendFrame(page, makeFrame([9]));
-  await expect(status).toHaveText('Gamepad pausado · Start: retomar');
+  await expect(status).toHaveText('Gamepad paused · Start: resume');
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([13]), true);
   // Hold beyond the movement repeat delay to confirm pause suppresses navigation.
@@ -290,7 +469,7 @@ test('Start blocks navigation and activation until resumed', async ({ page }) =>
   await expect(page.locator('body')).not.toHaveAttribute('data-activated', 'east');
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([9]));
-  await expect(status).toHaveText('Gamepad ativo · Start: pausar');
+  await expect(status).toHaveText('Gamepad active · Start: pause');
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([0]));
   await expect(page.locator('body')).toHaveAttribute('data-activated', 'east');

@@ -46,6 +46,11 @@ test('configures gamepad hotkeys from the new tab and applies saved bindings', a
   );
   await page.goto('chrome://newtab/');
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
+  await expect(page.locator('html')).toHaveAttribute('data-onboarding-ready', 'true');
+  if (await page.locator('#onboarding-panel').isVisible()) {
+    await page.locator('#onboarding-start').click();
+    await expect(page.locator('#onboarding-panel')).toBeHidden();
+  }
 
   await page.getByRole('link', { name: 'Controller settings' }).click();
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/settings\.html/);

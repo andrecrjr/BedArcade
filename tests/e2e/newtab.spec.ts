@@ -1,5 +1,8 @@
 import type { Page, BrowserContext } from '@playwright/test';
 import { E2E_GAMEPAD_MESSAGE, type GamepadFrame } from '../../lib/gamepad';
+import { DEFAULT_GAMEPAD_BINDINGS } from '../../lib/gamepad-bindings';
+import { detectAppLocale } from '../../lib/i18n';
+import { onboardingCompletionAfterInstall } from '../../lib/onboarding';
 import { expect, test } from './fixtures';
 
 function makeFrame(pressed: number[] = [], axes: number[] = [0, 0, 0, 0]): GamepadFrame {
@@ -30,6 +33,11 @@ async function openNewTab(context: BrowserContext) {
   const page = await context.newPage();
   await page.goto('chrome://newtab/');
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
+  await expect(page.locator('html')).toHaveAttribute('data-onboarding-ready', 'true');
+  if (await page.locator('#onboarding-panel').isVisible()) {
+    await page.locator('#onboarding-start').click();
+    await expect(page.locator('#onboarding-panel')).toBeHidden();
+  }
   await expect(page.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
   return page;
 }
@@ -49,7 +57,10 @@ test.beforeEach(async ({ context }) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/html',
-      body: '<!doctype html><link rel="icon" href="/favicon.svg"><button>Game control</button>',
+      body:
+        url.pathname === '/text-fields'
+          ? '<!doctype html><input id="text-input" type="text"><textarea id="message"></textarea>'
+          : '<!doctype html><link rel="icon" href="/favicon.svg"><button>Game control</button>',
     });
   });
   await context.route('https://www.youtube.com/**', (route) =>
@@ -67,6 +78,123 @@ test('opens the navigator on first install', async ({ context }) => {
       context.pages().some((page) => /chrome-extension:\/\/[^/]+\/newtab\.html/.test(page.url())),
     )
     .toBe(true);
+
+  const page = context.pages().find((current) => /newtab\.html/.test(current.url()));
+  if (!page) throw new Error('The first-install launcher did not open');
+  await expect(page.locator('#onboarding-panel')).toBeVisible();
+  await expect(page.locator('[data-onboarding-card]')).toHaveCount(3);
+  await expect(page.locator('[data-onboarding-command]')).toHaveCount(9);
+  await expect(page.locator('[data-command-label]')).toHaveText([
+    'Move focus',
+    'Scroll page',
+    'Open / select',
+    'Go back',
+    'Previous tab',
+    'Next tab',
+    'Reload page',
+    'Open new tab',
+    'Pause / resume',
+  ]);
+  await expect(page.locator('#controller-hints span')).toHaveCount(9);
+  await expect(page.locator('#language-select option')).toHaveCount(3);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async () => (await chrome.storage.local.get('onboardingCompleted')).onboardingCompleted,
+      ),
+    )
+    .toBe(false);
+
+  await page.locator('#language-select').selectOption('es');
+  await expect(page.locator('[data-command-label]')).toHaveText([
+    'Mover foco',
+    'Desplazar página',
+    'Abrir / seleccionar',
+    'Volver',
+    'Pestaña anterior',
+    'Pestaña siguiente',
+    'Recargar página',
+    'Abrir pestaña nueva',
+    'Pausar / reanudar',
+  ]);
+
+  await page.locator('#language-select').selectOption('pt-BR');
+  await expect(page.locator('[data-command-label]')).toHaveText([
+    'Mover foco',
+    'Rolar a página',
+    'Abrir / selecionar',
+    'Voltar',
+    'Aba anterior',
+    'Próxima aba',
+    'Recarregar página',
+    'Abrir nova aba',
+    'Pausar / retomar',
+  ]);
+
+  await page.evaluate((bindings) => chrome.storage.local.set({ gamepadBindings: bindings }), {
+    ...DEFAULT_GAMEPAD_BINDINGS,
+    activate: 3,
+  });
+  await expect(page.locator('[data-onboarding-command="activate"] kbd')).toHaveText('Y');
+});
+
+test('keeps existing profiles out of the first-install tutorial after updates', () => {
+  expect(onboardingCompletionAfterInstall('install', undefined)).toBe(false);
+  expect(onboardingCompletionAfterInstall('update', undefined)).toBe(true);
+  expect(onboardingCompletionAfterInstall('update', false)).toBe(null);
+  expect(onboardingCompletionAfterInstall('update', true)).toBe(null);
+});
+
+test('detects the first supported browser language', () => {
+  expect(detectAppLocale(['pt-BR', 'en-US'])).toBe('pt-BR');
+  expect(detectAppLocale(['es-ES', 'en-US'])).toBe('es');
+  expect(detectAppLocale(['en-US', 'pt-BR'])).toBe('en');
+  expect(detectAppLocale(['fr-FR'])).toBe('en');
+});
+
+test('switches every extension surface to the chosen language and remembers it', async ({
+  context,
+}) => {
+  const page = await openNewTab(context);
+  await page.locator('#language-select').selectOption('es');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await expect(page.getByRole('heading', { name: /Elige tu próximo mundo/i })).toBeVisible();
+
+  await page.locator('#settings-link').click();
+  await expect(page).toHaveURL(/settings\.html/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await expect(page.getByRole('heading', { name: 'Atajos del mando' })).toBeVisible();
+  await expect(page.locator('#language-select')).toHaveValue('es');
+
+  await page.goto('https://alpha.test/text-fields');
+  const status = page.locator('[data-gamepad-navigator="status"]');
+  const keyboard = page.locator('[data-gamepad-navigator="keyboard"]');
+  await sendFrame(page, makeFrame(), true);
+  await expect(status).toContainText('Mando activo');
+  await page.locator('#text-input').focus();
+  await expect(keyboard).toBeVisible();
+  await expect(keyboard).toHaveAttribute('aria-label', 'Teclado flotante');
+  await expect(keyboard.locator('[data-key-action="hide"]')).toHaveAccessibleName('Ocultar');
+});
+
+test('can reopen the tutorial after completing first-run onboarding', async ({ context }) => {
+  const page = await openNewTab(context);
+  await expect(page.locator('#onboarding-panel')).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async () => (await chrome.storage.local.get('onboardingCompleted')).onboardingCompleted,
+      ),
+    )
+    .toBe(true);
+
+  await page.locator('#help-link').click();
+  await expect(page.locator('#onboarding-panel')).toBeVisible();
+  await page.locator('#onboarding-skip').click();
+  await expect(page.locator('#onboarding-panel')).toBeHidden();
+
+  const nextTab = await openNewTab(context);
+  await expect(nextTab.locator('#onboarding-panel')).toBeHidden();
 });
 
 test('overrides every new tab and focuses the first starter shortcut', async ({ context }) => {
@@ -125,6 +253,7 @@ test('gamepad reaches the address field from the focused shortcut', async ({ con
 });
 
 test('gamepad types in the floating keyboard on the new tab', async ({ context }) => {
+  test.setTimeout(60000);
   const page = await openNewTab(context);
   const status = page.locator('#controller-status');
   const keyboard = page.locator('[data-gamepad-navigator="keyboard"]');

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-i18n-page-title="newTabTitle">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,24 +15,46 @@
           <span class="brand-name">GAMEPAD <strong>NAVIGATOR</strong></span>
         </div>
         <div class="topbar-actions">
-          <a class="settings-link" href="/settings.html">Controller settings</a>
+          <label class="language-control">
+            <span data-i18n="language">Language</span>
+            <select id="language-select" data-i18n-aria-label="language">
+              <option value="en">English</option>
+              <option value="pt-BR">Português (Brasil)</option>
+              <option value="es">Español</option>
+            </select>
+          </label>
+          <button id="help-link" class="settings-link" type="button" data-i18n="howToUse">
+            How to use
+          </button>
+          <a
+            id="settings-link"
+            class="settings-link"
+            href="/settings.html"
+            data-i18n="controllerSettings"
+            >Controller settings</a
+          >
           <div id="controller-status" class="controller-status" role="status" aria-live="polite">
-            Press any controller button to connect
+            <span data-i18n="controllerConnect">Press any controller button to connect</span>
           </div>
         </div>
       </header>
 
       <main>
-        <section class="home-panel" aria-labelledby="welcome-title">
+        <section id="home-panel" class="home-panel" aria-labelledby="welcome-title">
           <div class="welcome">
-            <p class="eyebrow">QUICK LAUNCH <span>·</span> PLAYER HUB</p>
-            <h1 id="welcome-title">Choose your <span>next world.</span></h1>
-            <p class="welcome-copy">Jump into a favorite or enter a website address.</p>
+            <p class="eyebrow" data-i18n="homeEyebrow">QUICK LAUNCH · PLAYER HUB</p>
+            <h1 id="welcome-title">
+              <span class="title-lead" data-i18n="homeTitleLead">Choose your</span>
+              <span data-i18n="homeTitleAccent">next world.</span>
+            </h1>
+            <p class="welcome-copy" data-i18n="homeCopy">
+              Jump into a favorite or enter a website address.
+            </p>
           </div>
 
           <form id="site-form" novalidate>
             <div class="address-controls">
-              <label for="site-url">Website address</label>
+              <label for="site-url" data-i18n="addressLabel">Website address</label>
               <div class="address-row">
                 <input
                   id="site-url"
@@ -43,27 +65,31 @@
                   autocapitalize="none"
                   spellcheck="false"
                   placeholder="example.com"
+                  data-i18n-placeholder="addressPlaceholder"
                   aria-describedby="feedback"
                 />
-                <button class="open-button" type="submit">Launch <kbd>A</kbd></button>
+                <button class="open-button" type="submit">
+                  <span data-i18n="launch">Launch</span> <kbd>A</kbd>
+                </button>
               </div>
             </div>
 
             <section
               id="tv-mode-settings"
               class="tv-mode-settings"
+              data-i18n-aria-label="tvSettingsLabel"
               aria-label="TV mode settings"
               hidden
             >
               <div class="tv-mode-row">
                 <label class="tv-mode-toggle" for="tv-mode-enabled">
                   <input id="tv-mode-enabled" type="checkbox" disabled />
-                  <span>Open this site in TV mode</span>
+                  <span data-i18n="tvModeToggle">Open this site in TV mode</span>
                 </label>
                 <p id="tv-mode-hint" class="tv-mode-hint"></p>
               </div>
               <div id="tv-url-field" class="tv-url-field" hidden>
-                <label for="tv-url">TV landing URL</label>
+                <label for="tv-url" data-i18n="tvUrlLabel">TV landing URL</label>
                 <input
                   id="tv-url"
                   name="tv-url"
@@ -73,24 +99,32 @@
                   autocapitalize="none"
                   spellcheck="false"
                   placeholder="Blank uses the Android TV profile"
+                  data-i18n-placeholder="tvUrlPlaceholder"
                   aria-describedby="tv-url-help"
                 />
                 <p id="tv-url-help" class="tv-url-help">
-                  Use a URL on this site. YouTube uses its built-in /tv route.
+                  <span data-i18n="tvUrlHelp">
+                    Use a URL on this site. YouTube uses its built-in /tv route.
+                  </span>
                 </p>
               </div>
             </section>
 
             <div class="pin-form-row">
-              <label class="visually-hidden" for="site-label">Shortcut name (optional)</label>
+              <label class="visually-hidden" for="site-label" data-i18n="shortcutNameLabel"
+                >Shortcut name (optional)</label
+              >
               <input
                 id="site-label"
                 name="label"
                 type="text"
                 autocomplete="off"
                 placeholder="Shortcut name (optional)"
+                data-i18n-placeholder="shortcutNamePlaceholder"
               />
-              <button id="save-pin" class="pin-button" type="button">Add shortcut</button>
+              <button id="save-pin" class="pin-button" type="button" data-i18n="addShortcut">
+                Add shortcut
+              </button>
             </div>
             <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
           </form>
@@ -98,24 +132,102 @@
           <section class="shortcut-section" aria-labelledby="shortcuts-title">
             <div class="section-heading">
               <div>
-                <p class="section-kicker">YOUR LIBRARY</p>
-                <h2 id="shortcuts-title">Quick launch</h2>
-                <p>Pick a favorite and jump back in.</p>
+                <p class="section-kicker" data-i18n="shortcutKicker">YOUR LIBRARY</p>
+                <h2 id="shortcuts-title" data-i18n="shortcutTitle">Quick launch</h2>
+                <p data-i18n="shortcutCopy">Pick a favorite and jump back in.</p>
               </div>
-              <button id="edit-pins" class="quiet-button" type="button">Edit</button>
+              <button id="edit-pins" class="quiet-button" type="button" data-i18n="edit">
+                Edit
+              </button>
             </div>
-            <div id="pin-grid" class="pin-grid" role="group" aria-label="Pinned websites"></div>
+            <div
+              id="pin-grid"
+              class="pin-grid"
+              role="group"
+              aria-label="Pinned websites"
+              data-i18n-aria-label="pinnedWebsites"
+            ></div>
           </section>
+        </section>
+        <section
+          id="onboarding-panel"
+          class="onboarding-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="onboarding-title"
+          hidden
+        >
+          <div class="onboarding-content">
+            <p class="eyebrow" data-i18n="onboardingEyebrow">PLAYER ONE · READY</p>
+            <h2 id="onboarding-title" data-i18n="onboardingTitle">Welcome to Gamepad Navigator</h2>
+            <p class="onboarding-intro" data-i18n="onboardingIntro">
+              Your web, ready to play from the couch.
+            </p>
+            <div class="onboarding-cards">
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🎮</span>
+                <h3 data-i18n="onboardingConnectTitle">1. Connect your controller</h3>
+                <p data-i18n="onboardingConnectCopy">
+                  Connect a USB or Bluetooth controller, then press any button. You can also
+                  continue with your keyboard or mouse.
+                </p>
+              </article>
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🕹️</span>
+                <h3 data-i18n="onboardingControlsTitle">2. All controller commands</h3>
+                <p id="onboarding-controls-copy" data-i18n="onboardingControlsCopy">
+                  LS is the left stick; RS is the right stick. Press RB alone for the next tab, or
+                  RB + X together to reload.
+                </p>
+                <ul
+                  id="onboarding-commands"
+                  class="onboarding-command-list"
+                  aria-label="Controller controls"
+                  data-i18n-aria-label="controllerHints"
+                ></ul>
+              </article>
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🚀</span>
+                <h3 data-i18n="onboardingLauncherTitle">3. Launch a site</h3>
+                <p data-i18n="onboardingLauncherCopy">
+                  Choose a favorite or enter a web address. Focus a text field to open the floating
+                  keyboard.
+                </p>
+              </article>
+            </div>
+            <div class="onboarding-actions">
+              <button
+                id="onboarding-skip"
+                class="quiet-button"
+                type="button"
+                data-i18n="onboardingSkip"
+              >
+                Skip tutorial
+              </button>
+              <button
+                id="onboarding-start"
+                class="pin-button"
+                type="button"
+                data-i18n="onboardingStart"
+              >
+                Start browsing
+              </button>
+            </div>
+          </div>
         </section>
       </main>
 
       <footer class="footer">
         <div id="controller-hints" class="controller-hints" aria-label="Controller controls">
-          <span><kbd>DPAD</kbd> MOVE</span>
-          <span><kbd>A</kbd> SELECT</span>
-          <span><kbd>B</kbd> BACK</span>
-          <span><kbd>LB/RB</kbd> SWITCH TABS</span>
-          <span><kbd>START</kbd> PAUSE</span>
+          <span><kbd>↑/↓/←/→ / LS</kbd> MOVE FOCUS</span>
+          <span><kbd>RS ↑/↓</kbd> SCROLL PAGE</span>
+          <span><kbd>A</kbd> OPEN / SELECT</span>
+          <span><kbd>B</kbd> GO BACK</span>
+          <span><kbd>LB</kbd> PREVIOUS TAB</span>
+          <span><kbd>RB</kbd> NEXT TAB</span>
+          <span><kbd>RB + X</kbd> RELOAD PAGE</span>
+          <span><kbd>R3</kbd> OPEN NEW TAB</span>
+          <span><kbd>START</kbd> PAUSE / RESUME</span>
         </div>
       </footer>
     </div>

@@ -1,3 +1,5 @@
+import { applyTranslations, loadAppLocale, watchAppLocale, type TranslationKey } from './i18n';
+
 type TextField = HTMLInputElement | HTMLTextAreaElement;
 
 const TEXT_INPUT_TYPES = new Set(['email', 'number', 'password', 'search', 'tel', 'text', 'url']);
@@ -29,11 +31,20 @@ function replaceText(target: TextField, start: number, end: number, text: string
   target.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
 }
 
-function createKey(label: string, key?: string, action?: string) {
+function createKey(
+  label: string,
+  key?: string,
+  action?: string,
+  translationKey?: TranslationKey,
+  ariaTranslationKey?: TranslationKey,
+) {
   const button = document.createElement('button');
   button.type = 'button';
   button.textContent = label;
   button.setAttribute('aria-label', label === '⌫' ? 'Backspace' : label === '⇧' ? 'Shift' : label);
+  if (translationKey) button.dataset.i18n = translationKey;
+  const labelKey = ariaTranslationKey ?? translationKey;
+  if (labelKey) button.dataset.i18nAriaLabel = labelKey;
   if (key !== undefined) button.dataset.key = key;
   if (action) button.dataset.keyAction = action;
   button.addEventListener('mousedown', (event) => event.preventDefault());
@@ -67,6 +78,7 @@ export function attachFloatingKeyboard({
   keyboard.dataset.gamepadNavigator = 'keyboard';
   keyboard.setAttribute('role', 'group');
   keyboard.setAttribute('aria-label', 'Floating keyboard');
+  keyboard.dataset.i18nAriaLabel = 'keyboardGroup';
   Object.assign(keyboard.style, {
     position: 'fixed',
     left: '12px',
@@ -99,7 +111,8 @@ export function attachFloatingKeyboard({
   });
   const title = document.createElement('span');
   title.textContent = 'Keyboard';
-  const hideKey = createKey('Hide', undefined, 'hide');
+  title.dataset.i18n = 'keyboardTitle';
+  const hideKey = createKey('Hide', undefined, 'hide', 'keyboardHide');
   Object.assign(hideKey.style, { flex: '0 0 auto', height: '28px', fontSize: '11px' });
   header.append(title, hideKey);
   keyboard.append(header);
@@ -112,9 +125,10 @@ export function attachFloatingKeyboard({
       gap: '4px',
       marginTop: '4px',
     });
-    if (shift) row.append(createKey('⇧', undefined, 'shift'));
+    if (shift) row.append(createKey('⇧', undefined, 'shift', undefined, 'keyboardShift'));
     for (const key of keys) row.append(createKey(key, key));
-    if (backspace) row.append(createKey('⌫', undefined, 'backspace'));
+    if (backspace)
+      row.append(createKey('⌫', undefined, 'backspace', undefined, 'keyboardBackspace'));
     keyboard.append(row);
   }
 
@@ -125,10 +139,10 @@ export function attachFloatingKeyboard({
   addRow(['-', '_', '.', ',', '/', '?', '!', '@', '#', ':']);
   const utilityRow = document.createElement('div');
   Object.assign(utilityRow.style, { display: 'flex', gap: '4px', marginTop: '4px' });
-  utilityRow.append(createKey('Clear', undefined, 'clear'));
-  const spaceKey = createKey('Space', ' ');
+  utilityRow.append(createKey('Clear', undefined, 'clear', 'keyboardClear'));
+  const spaceKey = createKey('Space', ' ', undefined, 'keyboardSpace');
   Object.assign(spaceKey.style, { flex: '3' });
-  utilityRow.append(spaceKey, createKey('Enter', undefined, 'enter'));
+  utilityRow.append(spaceKey, createKey('Enter', undefined, 'enter', 'keyboardEnter'));
   keyboard.append(utilityRow);
 
   const urlShortcutRow = urlShortcuts ? document.createElement('div') : null;
@@ -136,6 +150,7 @@ export function attachFloatingKeyboard({
     urlShortcutRow.dataset.urlShortcuts = '';
     urlShortcutRow.setAttribute('role', 'group');
     urlShortcutRow.setAttribute('aria-label', 'URL shortcuts');
+    urlShortcutRow.dataset.i18nAriaLabel = 'urlShortcuts';
     Object.assign(urlShortcutRow.style, {
       display: 'none',
       flexWrap: 'wrap',
@@ -273,6 +288,14 @@ export function attachFloatingKeyboard({
   }
 
   root.append(keyboard);
+  let localeChanged = false;
+  const stopLocaleWatch = watchAppLocale((locale) => {
+    localeChanged = true;
+    applyTranslations(keyboard, locale);
+  });
+  void loadAppLocale().then((locale) => {
+    if (!localeChanged) applyTranslations(keyboard, locale);
+  });
   document.addEventListener('focusin', onFocusIn);
   document.addEventListener('focusout', onFocusOut);
   document.addEventListener('pointerdown', onPointerDown, true);
@@ -288,6 +311,7 @@ export function attachFloatingKeyboard({
     window.removeEventListener('resize', schedulePosition);
     window.removeEventListener('scroll', schedulePosition, true);
     keyboard.removeEventListener('click', onClick);
+    stopLocaleWatch();
     keyboard.remove();
   };
 }

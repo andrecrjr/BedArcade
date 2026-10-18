@@ -1,23 +1,57 @@
 export type Direction = 'up' | 'down' | 'left' | 'right';
 const SELECTOR =
-  'a[href],button,input:not([type="hidden"]),select,textarea,summary,[role="button"],[role="link"],[role="checkbox"],[role="radio"],[tabindex]:not([tabindex="-1"])';
+  'a[href],button,input:not([type="hidden"]),select,textarea,summary,[role="button"],[role="link"],[role="checkbox"],[role="radio"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="option"],[role="tab"],[role="switch"],[role="slider"],[role="spinbutton"],[role="textbox"],[role="searchbox"],[role="combobox"],[role="treeitem"],[role="gridcell"],[tabindex]:not([tabindex="-1"])';
+const LAYER_SELECTOR = 'dialog[open],[role="dialog"],[role="alertdialog"],[popover]';
+
+function visible(el: HTMLElement): boolean {
+  if (el.closest('[inert],[aria-hidden="true"]') || el.matches(':disabled,[aria-disabled="true"]'))
+    return false;
+  const style = getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+  return (
+    style.display !== 'none' &&
+    style.visibility === 'visible' &&
+    style.opacity !== '0' &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < innerHeight &&
+    rect.left < innerWidth
+  );
+}
+
+function openLayer(el: HTMLElement): boolean {
+  if (el instanceof HTMLDialogElement) return el.open;
+  if (el.hasAttribute('popover')) {
+    try {
+      return el.matches(':popover-open');
+    } catch {
+      return false;
+    }
+  }
+  return el.getAttribute('aria-modal') !== 'false';
+}
+
+function activeLayer(): HTMLElement | null {
+  const layers = [...document.querySelectorAll<HTMLElement>(LAYER_SELECTOR)].filter(
+    (el) => openLayer(el) && visible(el),
+  );
+  const focusedLayer =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement.closest<HTMLElement>(LAYER_SELECTOR)
+      : null;
+  return (
+    (focusedLayer && layers.includes(focusedLayer) ? focusedLayer : null) ?? layers.at(-1) ?? null
+  );
+}
 
 export function candidates(): HTMLElement[] {
-  return [...document.querySelectorAll<HTMLElement>(SELECTOR)].filter((el) => {
-    if (el.closest('[inert]') || el.matches(':disabled,[aria-disabled="true"]')) return false;
-    const style = getComputedStyle(el);
-    const rect = el.getBoundingClientRect();
-    return (
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      rect.width > 0 &&
-      rect.height > 0 &&
-      rect.bottom > 0 &&
-      rect.right > 0 &&
-      rect.top < innerHeight &&
-      rect.left < innerWidth
-    );
-  });
+  const layer = activeLayer();
+  const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
+  return [...document.querySelectorAll<HTMLElement>(SELECTOR)].filter(
+    (el) => (!layer || layer.contains(el) || keyboard?.contains(el)) && visible(el),
+  );
 }
 
 function center(el: HTMLElement) {

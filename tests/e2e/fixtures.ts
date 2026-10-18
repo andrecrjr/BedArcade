@@ -1,4 +1,4 @@
-import { chromium, test as base, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, expect, test as base, type BrowserContext, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
@@ -12,6 +12,16 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
       args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
     });
     try {
+      await expect
+        .poll(() =>
+          context
+            .pages()
+            .some((page) => /chrome-extension:\/\/[^/]+\/newtab\.html/.test(page.url())),
+        )
+        .toBe(true);
+      const launcherPage = context.pages().find((page) => /newtab\.html/.test(page.url()));
+      if (!launcherPage) throw new Error('The first-install launcher did not open');
+      await expect(launcherPage.locator('html')).toHaveAttribute('data-onboarding-ready', 'true');
       await use(context);
     } finally {
       await context.close();

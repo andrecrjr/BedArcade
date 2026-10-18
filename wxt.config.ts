@@ -2,8 +2,9 @@ import { defineConfig } from 'wxt';
 
 export default defineConfig({
   manifest: {
-    name: 'Gamepad Navigator',
-    description: 'Navigate the web with a gamepad.',
+    name: '__MSG_extensionName__',
+    description: '__MSG_extensionDescription__',
+    default_locale: 'en',
     icons: {
       16: '/icons/icon-16.png',
       32: '/icons/icon-32.png',

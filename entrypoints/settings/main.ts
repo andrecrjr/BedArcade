@@ -6,6 +6,18 @@ import {
   normalizeGamepadBindings,
   saveGamepadBindings,
 } from '../../lib/gamepad-bindings';
+import {
+  applyTranslations,
+  detectAppLocale,
+  gamepadButtonLabel,
+  loadAppLocale,
+  normalizeAppLocale,
+  saveAppLocale,
+  translate,
+  watchAppLocale,
+  type AppLocale,
+  type TranslationKey,
+} from '../../lib/i18n';
 import '../newtab/style.css';
 import './style.css';
 
@@ -16,9 +28,19 @@ const selects = [...document.querySelectorAll<HTMLSelectElement>('[data-binding]
 
 if (!form || !feedback || !restoreButton) throw new Error('Controller settings page is incomplete');
 const settingsFeedback = feedback;
+const languageSelect = document.querySelector<HTMLSelectElement>('#language-select');
+if (!languageSelect) throw new Error('The language selector is missing');
+const languagePicker = languageSelect;
 
-function setFeedback(message: string, isError = false) {
-  settingsFeedback.textContent = message;
+let appLocale: AppLocale = detectAppLocale();
+let feedbackKey: TranslationKey | null = null;
+let feedbackIsError = false;
+let languageChanged = false;
+
+function setFeedback(key: TranslationKey, isError = false) {
+  feedbackKey = key;
+  feedbackIsError = isError;
+  settingsFeedback.textContent = translate(appLocale, key);
   settingsFeedback.dataset.error = String(isError);
 }
 
@@ -32,7 +54,7 @@ function displayBindings(bindings: typeof DEFAULT_GAMEPAD_BINDINGS) {
       ...GAMEPAD_BUTTON_OPTIONS.map((button) => {
         const option = document.createElement('option');
         option.value = String(button.value);
-        option.textContent = `${button.value} · ${button.label}`;
+        option.textContent = `${button.value} · ${gamepadButtonLabel(appLocale, button.value)}`;
         return option;
       }),
     );
@@ -49,28 +71,63 @@ function readBindings() {
   return normalizeGamepadBindings(values);
 }
 
-async function save(bindings: typeof DEFAULT_GAMEPAD_BINDINGS, message: string) {
+async function save(bindings: typeof DEFAULT_GAMEPAD_BINDINGS, message: TranslationKey) {
   try {
     await saveGamepadBindings(bindings);
     setFeedback(message);
   } catch {
-    setFeedback('Could not save controller settings.', true);
+    setFeedback('feedbackCouldNotSaveControls', true);
   }
 }
+
+function setLocale(locale: AppLocale) {
+  appLocale = locale;
+  languagePicker.value = locale;
+  applyTranslations(document, locale);
+  displayBindings(readBindings());
+  if (feedbackKey) {
+    settingsFeedback.textContent = translate(locale, feedbackKey);
+    settingsFeedback.dataset.error = String(feedbackIsError);
+  }
+}
+
+applyTranslations(document, appLocale);
+const stopLocaleWatch = watchAppLocale((locale) => {
+  languageChanged = true;
+  setLocale(locale);
+});
+void loadAppLocale().then((locale) => {
+  if (!languageChanged) setLocale(locale);
+});
+languagePicker.addEventListener('change', () => {
+  const locale = normalizeAppLocale(languagePicker.value);
+  if (!locale) return;
+  languageChanged = true;
+  setLocale(locale);
+  void saveAppLocale(locale).catch(() => setFeedback('feedbackCouldNotSaveLanguage', true));
+});
 
 void loadGamepadBindings()
   .then(displayBindings)
   .catch(() => {
     displayBindings(DEFAULT_GAMEPAD_BINDINGS);
-    setFeedback('Could not load saved controls. Defaults are shown.', true);
+    setFeedback('feedbackCouldNotLoadControls', true);
   });
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  void save(readBindings(), 'Controls saved.');
+  void save(readBindings(), 'controlsSaved');
 });
 
 restoreButton.addEventListener('click', () => {
   displayBindings(DEFAULT_GAMEPAD_BINDINGS);
-  void save(DEFAULT_GAMEPAD_BINDINGS, 'Default controls restored.');
+  void save(DEFAULT_GAMEPAD_BINDINGS, 'defaultsRestored');
 });
+
+window.addEventListener(
+  'pagehide',
+  () => {
+    stopLocaleWatch();
+  },
+  { once: true },
+);
