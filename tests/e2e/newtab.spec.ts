@@ -38,7 +38,7 @@ async function openNewTab(context: BrowserContext) {
     await page.locator('#onboarding-start').click();
     await expect(page.locator('#onboarding-panel')).toBeHidden();
   }
-  await expect(page.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /your browser arcade/i })).toBeVisible();
   return page;
 }
 
@@ -167,7 +167,7 @@ test('switches every extension surface to the chosen language and remembers it',
   const page = await openNewTab(context);
   await page.locator('#language-select').selectOption('es');
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
-  await expect(page.getByRole('heading', { name: /Elige tu próximo mundo/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /tu arcade en el navegador/i })).toBeVisible();
 
   await page.locator('#settings-link').click();
   await expect(page).toHaveURL(/settings\.html/);
@@ -182,7 +182,10 @@ test('switches every extension surface to the chosen language and remembers it',
   await expect(status).toContainText('Mando activo');
   await page.locator('#text-input').focus();
   await expect(keyboard).toBeVisible();
-  await expect(keyboard).toHaveAttribute('aria-label', 'Teclado flotante');
+  await expect(keyboard).toHaveAttribute(
+    'aria-label',
+    'Teclado en pantalla. A o X escribe; Start envía el formulario; B lo cierra.',
+  );
   await expect(keyboard.locator('[data-key-action="hide"]')).toHaveAccessibleName('Ocultar');
 });
 
@@ -361,7 +364,7 @@ test('R3 opens a new navigator tab from the new tab page', async ({ context }) =
   const newPage = await newPagePromise;
   await expect.poll(() => context.pages().length).toBe(initialCount + 1);
   await expect(newPage).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
-  await expect(newPage.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
+  await expect(newPage.getByRole('heading', { name: /your browser arcade/i })).toBeVisible();
 });
 
 test('RB + X refreshes the new tab page', async ({ context }) => {
@@ -374,9 +377,7 @@ test('RB + X refreshes the new tab page', async ({ context }) => {
   await reload;
 
   await expect(navigatorPage).toHaveURL(/chrome-extension:\/\/[^/]+\/newtab\.html/);
-  await expect(
-    navigatorPage.getByRole('heading', { name: /choose your next world/i }),
-  ).toBeVisible();
+  await expect(navigatorPage.getByRole('heading', { name: /your browser arcade/i })).toBeVisible();
 });
 
 test('shoulder navigation keeps working across repeated tab switches', async ({ context }) => {

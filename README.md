@@ -4,7 +4,7 @@ BedArcade transforma a nova aba do Chrome em um arcade de navegador: organize at
 
 ## Requisitos
 
-- Node.js 20+
+- Node.js 24.10+
 - Chrome
 - Gamepad USB/Bluetooth compatível com Gamepad API
 
@@ -23,6 +23,14 @@ Para build de produção:
 npm run build
 npm run zip
 ```
+
+## Integração contínua e releases
+
+Pull requests para `main` executam formatação, lint, verificação de tipos e empacotamento da extensão. Quando uma alteração chega a `main`, o semantic-release analisa as mensagens dos commits e, se houver uma mudança lançável, cria a tag e a GitHub Release com notas e o ZIP versionado da extensão.
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) para que o semantic-release calcule a versão: `feat:` gera uma versão minor, `fix:` uma patch e uma mudança incompatível (`!` ou `BREAKING CHANGE:` no corpo) uma major. Por exemplo, `feat: add favorites` ou `fix: keep gamepad focus visible`. Commits como `docs:` e `chore:` não geram release por padrão. Em pull requests com squash merge, use esse padrão no título para que ele também apareça na mensagem do commit em `main`.
+
+O job de release usa o `GITHUB_TOKEN` fornecido pelo GitHub Actions com permissão `contents: write`. O semantic-release atualiza a versão apenas durante o build para que o manifesto e o ZIP coincidam; `npmPublish: false` impede publicação no npm. Não são necessárias credenciais da Chrome Web Store nem secrets adicionais. Como ainda não há tags de release, a primeira versão criada seguirá o padrão inicial do semantic-release (`v1.0.0`).
 
 ## Recursos visuais
 

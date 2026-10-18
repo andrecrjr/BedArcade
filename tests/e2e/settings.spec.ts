@@ -55,7 +55,7 @@ test('configures gamepad hotkeys from the new tab and applies saved bindings', a
   await page.getByRole('link', { name: 'Controller settings' }).click();
   await expect(page).toHaveURL(/chrome-extension:\/\/[^/]+\/settings\.html/);
   await expect(page.getByRole('heading', { name: 'Controller hotkeys' })).toBeVisible();
-  await expect(page.locator('[data-binding]')).toHaveCount(12);
+  await expect(page.locator('[data-binding]')).toHaveCount(11);
   await expect(page.locator('#binding-activate')).toHaveValue('0');
   await expect(page.locator('#binding-refresh-modifier')).toHaveValue('5');
   await expect(page.locator('#binding-refresh-trigger')).toHaveValue('2');
@@ -70,7 +70,7 @@ test('configures gamepad hotkeys from the new tab and applies saved bindings', a
 
   const newTabUrl = await page.evaluate(() => chrome.runtime.getURL('newtab.html'));
   await page.goto(newTabUrl);
-  await expect(page.getByRole('heading', { name: /choose your next world/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /your browser arcade/i })).toBeVisible();
   await page.locator('[data-launch="youtube"]').focus();
   await sendFrame(page, makeFrame(), true);
   await sendFrame(page, makeFrame([3]));

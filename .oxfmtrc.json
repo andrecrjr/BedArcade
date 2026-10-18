@@ -3,6 +3,8 @@
   "singleQuote": true,
   "trailingComma": "all",
   "ignorePatterns": [
+    "AGENTS.md",
+    ".claude/**",
     ".output/**",
     ".wxt/**",
     "node_modules/**",
