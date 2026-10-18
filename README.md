@@ -47,7 +47,7 @@ Para validar um controle físico manualmente:
 1. Instale a build de `.output/chrome-mv3` e abra uma nova aba.
 2. Conecte o controle e pressione um botão para que o Chrome o reconheça.
 3. Use D-pad/analógico esquerdo para navegar pelos atalhos ou pelo teclado virtual.
-4. A/X clica ou escolhe; Select pausa e retoma.
+4. A/X clica ou escolhe; Start envia formulários; Select pausa e retoma.
 5. Com o teclado virtual aberto, B o fecha; fora dele, B volta. LB/RB trocam abas.
 6. Os atalhos iniciais incluem AC-JR, YouTube, Google, Steam, CrazyGames e jogos de navegador do itch.io. Adicione, edite ou remova atalhos no launcher.
 

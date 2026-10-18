@@ -10,12 +10,15 @@ import { createGamepadPrompt } from './gamepad-icons';
 import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
+  GAMEPAD_START_BUTTON,
   loadGamepadBindings,
   normalizeGamepadBindings,
   type GamepadBindings,
 } from './gamepad-bindings';
 
 type TextField = HTMLInputElement | HTMLTextAreaElement;
+
+const keyboardSubmitTargets = new WeakMap<HTMLElement, () => TextField | null>();
 
 const TEXT_INPUT_TYPES = new Set(['email', 'number', 'password', 'search', 'tel', 'text', 'url']);
 
@@ -61,6 +64,35 @@ export function pressEnter(target: HTMLElement) {
     } else target.form?.requestSubmit();
   }
   target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+  return true;
+}
+
+export function submitForm(target: HTMLElement | null) {
+  const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
+  const keyboardTarget =
+    keyboard && keyboard.style.display !== 'none' ? keyboardSubmitTargets.get(keyboard)?.() : null;
+  const submitTarget = keyboardTarget ?? target;
+  if (!submitTarget) return false;
+
+  const form =
+    submitTarget instanceof HTMLFormElement
+      ? submitTarget
+      : (submitTarget.closest('form') ??
+        (submitTarget instanceof HTMLInputElement ||
+        submitTarget instanceof HTMLButtonElement ||
+        submitTarget instanceof HTMLSelectElement ||
+        submitTarget instanceof HTMLTextAreaElement
+          ? submitTarget.form
+          : null));
+  if (!form) return false;
+
+  const isSubmitter =
+    (submitTarget instanceof HTMLButtonElement && submitTarget.type === 'submit') ||
+    (submitTarget instanceof HTMLInputElement &&
+      (submitTarget.type === 'submit' || submitTarget.type === 'image'));
+  if (isSubmitter && submitTarget.form === form && !submitTarget.disabled)
+    form.requestSubmit(submitTarget);
+  else form.requestSubmit();
   return true;
 }
 
@@ -135,7 +167,7 @@ export function attachFloatingKeyboard({
     border: '1px solid rgba(235,235,235,.3)',
     borderRadius: '18px',
     padding: '12px',
-    background: 'linear-gradient(145deg, rgba(48,49,51,.98), rgba(29,30,32,.99))',
+    background: 'linear-gradient(145deg, rgba(48,49,51,.9), rgba(29,30,32,.92))',
     backdropFilter: 'blur(18px) saturate(110%)',
     color: '#f5f8fc',
     boxShadow: '0 18px 48px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.12)',
@@ -174,6 +206,7 @@ export function attachFloatingKeyboard({
   function renderControllerHint() {
     const hints = [
       { button: gamepadBindings.activate, labelKey: 'keyboardType' },
+      { button: GAMEPAD_START_BUTTON, labelKey: 'hintSubmit' },
       { button: gamepadBindings.back, labelKey: 'keyboardHide' },
     ] satisfies { button: number; labelKey: TranslationKey }[];
     controllerHint.replaceChildren(
@@ -301,6 +334,8 @@ export function attachFloatingKeyboard({
     keyboard.style.display = 'block';
     schedulePosition();
   }
+
+  keyboardSubmitTargets.set(keyboard, () => typingTarget);
 
   function onFocusIn(event: FocusEvent) {
     if (isTextField(event.target)) {

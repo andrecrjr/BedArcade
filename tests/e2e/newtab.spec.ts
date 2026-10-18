@@ -83,11 +83,12 @@ test('opens the navigator on first install', async ({ context }) => {
   if (!page) throw new Error('The first-install launcher did not open');
   await expect(page.locator('#onboarding-panel')).toBeVisible();
   await expect(page.locator('[data-onboarding-card]')).toHaveCount(3);
-  await expect(page.locator('[data-onboarding-command]')).toHaveCount(9);
+  await expect(page.locator('[data-onboarding-command]')).toHaveCount(10);
   await expect(page.locator('[data-command-label]')).toHaveText([
     'Move focus',
     'Scroll page',
     'Click / open focused control',
+    'Submit form',
     'Go back',
     'Previous tab',
     'Next tab',
@@ -95,7 +96,7 @@ test('opens the navigator on first install', async ({ context }) => {
     'Open new tab',
     'Pause / resume',
   ]);
-  await expect(page.locator('#controller-hints > span')).toHaveCount(9);
+  await expect(page.locator('#controller-hints > span')).toHaveCount(10);
   await expect(page.locator('#language-select option')).toHaveCount(3);
   await expect
     .poll(() =>
@@ -110,6 +111,7 @@ test('opens the navigator on first install', async ({ context }) => {
     'Mover foco',
     'Desplazar página',
     'Hacer clic / abrir el control enfocado',
+    'Enviar formulario',
     'Volver',
     'Pestaña anterior',
     'Pestaña siguiente',
@@ -123,6 +125,7 @@ test('opens the navigator on first install', async ({ context }) => {
     'Mover foco',
     'Rolar a página',
     'Clicar / abrir o controle em foco',
+    'Enviar formulário',
     'Voltar',
     'Aba anterior',
     'Próxima aba',

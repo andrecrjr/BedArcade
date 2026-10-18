@@ -3,6 +3,7 @@ import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
   GAMEPAD_SELECT_BUTTON,
+  GAMEPAD_START_BUTTON,
   loadGamepadBindings,
   normalizeGamepadBindings,
   type GamepadBindings,
@@ -22,6 +23,7 @@ export const E2E_GAMEPAD_MESSAGE = 'gamepad-navigator:e2e-gamepad';
 export type GamepadAction =
   | { type: 'move'; direction: Direction }
   | { type: 'activate' }
+  | { type: 'submit' }
   | { type: 'back' }
   | { type: 'refresh' }
   | { type: 'new-tab' }
@@ -172,6 +174,7 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
         const scrollY = pad.axes[3] ?? 0;
         if (Math.abs(scrollY) > 0.25) onAction({ type: 'scroll', amount: scrollY * 15 });
         if (edge(bindings.activate)) onAction({ type: 'activate' });
+        if (edge(GAMEPAD_START_BUTTON)) onAction({ type: 'submit' });
         if (edge(bindings.back)) onAction({ type: 'back' });
         if (edge(bindings.previousTab)) onAction({ type: 'previous-tab' });
 

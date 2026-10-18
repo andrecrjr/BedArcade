@@ -1,6 +1,6 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
-import { attachFloatingKeyboard, hideFloatingKeyboard } from '../lib/floating-keyboard';
+import { attachFloatingKeyboard, hideFloatingKeyboard, submitForm } from '../lib/floating-keyboard';
 import { showSelectPicker } from '../lib/select-picker';
 import { sendTabAction } from '../lib/tab-actions';
 import {
@@ -198,6 +198,7 @@ export default defineContentScript({
         if (action.type === 'move') move(action.direction);
         else if (action.type === 'scroll') window.scrollBy(0, action.amount);
         else if (action.type === 'activate') activate();
+        else if (action.type === 'submit') submitForm(selected);
         else if (action.type === 'back') {
           if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
           else if (hideFloatingKeyboard()) return;

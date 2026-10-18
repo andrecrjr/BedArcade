@@ -3,12 +3,17 @@ import {
   DEFAULT_GAMEPAD_BINDINGS,
   GAMEPAD_BINDINGS_STORAGE_KEY,
   GAMEPAD_SELECT_BUTTON,
+  GAMEPAD_START_BUTTON,
   loadGamepadBindings,
   normalizeGamepadBindings,
   type GamepadBindings,
 } from '../../lib/gamepad-bindings';
 import { loadPinnedSites, savePinnedSites, type PinnedSite } from '../../lib/pins';
-import { attachFloatingKeyboard, hideFloatingKeyboard } from '../../lib/floating-keyboard';
+import {
+  attachFloatingKeyboard,
+  hideFloatingKeyboard,
+  submitForm,
+} from '../../lib/floating-keyboard';
 import { createGamepadPrompt, type GamepadPromptItem } from '../../lib/gamepad-icons';
 import { nearest } from '../../lib/spatial';
 import { showSelectPicker } from '../../lib/select-picker';
@@ -126,6 +131,7 @@ function controllerCommands(bindings: GamepadBindings) {
       label: 'hintScroll',
     },
     { id: 'activate', buttons: [bindings.activate], label: 'hintSelect' },
+    { id: 'submit', buttons: [GAMEPAD_START_BUTTON], label: 'hintSubmit' },
     { id: 'back', buttons: [bindings.back], label: 'hintBack' },
     {
       id: 'previous-tab',
@@ -584,6 +590,8 @@ function moveFocus(direction: 'up' | 'down' | 'left' | 'right') {
 function handleGamepadAction(action: GamepadAction) {
   if (action.type === 'move') moveFocus(action.direction);
   else if (action.type === 'activate') activateFocusedElement();
+  else if (action.type === 'submit')
+    submitForm(document.activeElement instanceof HTMLElement ? document.activeElement : null);
   else if (action.type === 'scroll') window.scrollBy(0, action.amount);
   else if (action.type === 'back') {
     if (activeSelectPicker?.open) activeSelectPicker.close('cancel');

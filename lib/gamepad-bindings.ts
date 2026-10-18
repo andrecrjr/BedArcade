@@ -1,5 +1,6 @@
 export const GAMEPAD_BINDINGS_STORAGE_KEY = 'gamepadBindings';
 export const GAMEPAD_SELECT_BUTTON = 8;
+export const GAMEPAD_START_BUTTON = 9;
 
 export const GAMEPAD_BINDING_NAMES = [
   'moveUp',
@@ -55,7 +56,7 @@ export const GAMEPAD_BUTTON_OPTIONS = [
 ] as const;
 
 export const GAMEPAD_BINDABLE_BUTTON_OPTIONS = GAMEPAD_BUTTON_OPTIONS.filter(
-  ({ value }) => value !== GAMEPAD_SELECT_BUTTON,
+  ({ value }) => value !== GAMEPAD_SELECT_BUTTON && value !== GAMEPAD_START_BUTTON,
 );
 
 export function normalizeGamepadBindings(value: unknown): GamepadBindings {
@@ -70,7 +71,8 @@ export function normalizeGamepadBindings(value: unknown): GamepadBindings {
         Number.isInteger(button) &&
         button >= 0 &&
         button <= 15 &&
-        button !== GAMEPAD_SELECT_BUTTON
+        button !== GAMEPAD_SELECT_BUTTON &&
+        button !== GAMEPAD_START_BUTTON
           ? button
           : DEFAULT_GAMEPAD_BINDINGS[name],
       ];
