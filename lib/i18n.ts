@@ -72,6 +72,8 @@ const english = {
   feedbackShortcutRemoved: '{label} removed from shortcuts.',
   feedbackShortcutSaved: '{label} saved to shortcuts.',
   feedbackCouldNotSaveShortcut: 'Could not save this shortcut. Please try again.',
+  feedbackCouldNotSaveShortcutTvModeSaved:
+    'TV settings were saved, but the shortcut could not be saved.',
   feedbackCouldNotRemoveShortcut: 'Could not remove this shortcut. Please try again.',
   feedbackCouldNotLoadShortcuts: 'Could not load shortcuts from this browser profile.',
   feedbackCouldNotSaveLanguage: 'Could not save the language preference.',
@@ -241,6 +243,8 @@ const portuguese: Record<TranslationKey, string> = {
   feedbackShortcutRemoved: '{label} removido dos atalhos.',
   feedbackShortcutSaved: '{label} salvo nos atalhos.',
   feedbackCouldNotSaveShortcut: 'Não foi possível salvar o atalho. Tente novamente.',
+  feedbackCouldNotSaveShortcutTvModeSaved:
+    'As configurações de TV foram salvas, mas não foi possível salvar o atalho.',
   feedbackCouldNotRemoveShortcut: 'Não foi possível remover o atalho. Tente novamente.',
   feedbackCouldNotLoadShortcuts: 'Não foi possível carregar os atalhos deste perfil.',
   feedbackCouldNotSaveLanguage: 'Não foi possível salvar o idioma.',
@@ -409,6 +413,8 @@ const spanish: Record<TranslationKey, string> = {
   feedbackShortcutRemoved: '{label} se quitó de los accesos.',
   feedbackShortcutSaved: '{label} se guardó en los accesos.',
   feedbackCouldNotSaveShortcut: 'No se pudo guardar el acceso. Inténtalo de nuevo.',
+  feedbackCouldNotSaveShortcutTvModeSaved:
+    'Se guardaron los ajustes de TV, pero no se pudo guardar el acceso.',
   feedbackCouldNotRemoveShortcut: 'No se pudo quitar el acceso. Inténtalo de nuevo.',
   feedbackCouldNotLoadShortcuts: 'No se pudieron cargar los accesos de este perfil.',
   feedbackCouldNotSaveLanguage: 'No se pudo guardar el idioma.',

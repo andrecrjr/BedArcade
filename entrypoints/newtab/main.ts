@@ -8,7 +8,6 @@ import {
   normalizeGamepadBindings,
   type GamepadBindings,
 } from '../../lib/gamepad-bindings';
-import { loadPinnedSites, savePinnedSites, type PinnedSite } from '../../lib/pins';
 import {
   attachFloatingKeyboard,
   hideFloatingKeyboard,
@@ -26,14 +25,9 @@ import {
 import { nearest } from '../../lib/spatial';
 import { showSelectPicker } from '../../lib/select-picker';
 import { sendTabAction } from '../../lib/tab-actions';
-import {
-  createDefaultTvModeProfile,
-  getBuiltInTvUrl,
-  loadTvModeProfile,
-  normalizeTvUrl,
-  type TvModeProfile,
-} from '../../lib/tv-mode';
 import { normalizeUrl } from '../../lib/url';
+import { createPinsFeature } from './features/pins';
+import { createTvModeSettings } from './features/tv-mode-settings';
 import {
   applyTranslations,
   detectAppLocale,
@@ -81,7 +75,6 @@ const onboardingSkip = element<HTMLButtonElement>('onboarding-skip');
 const stopFloatingKeyboard = attachFloatingKeyboard({ urlShortcuts: true });
 
 let appLocale: AppLocale = detectAppLocale();
-let pinnedSites: PinnedSite[] = [];
 let currentBindings = DEFAULT_GAMEPAD_BINDINGS;
 let currentControllerState: GamepadState = {
   connected: false,
@@ -89,11 +82,6 @@ let currentControllerState: GamepadState = {
   gamepadId: null,
 };
 let activeSelectPicker: HTMLDialogElement | null = null;
-let editingPins = false;
-let editingPinId: string | null = null;
-let currentTvHostname: string | null = null;
-let currentTvProfile: TvModeProfile | null = null;
-let tvProfileLoadSequence = 0;
 let feedbackKey: TranslationKey | null = null;
 let feedbackValues: Record<string, string | number> = {};
 let onboardingVisible = true;
@@ -113,6 +101,29 @@ function setFeedback(
   feedback.textContent = translate(appLocale, key, values);
   feedback.dataset.error = String(isError);
 }
+
+const tvMode = createTvModeSettings({
+  urlInput,
+  settings: tvModeSettings,
+  enabled: tvModeEnabled,
+  hint: tvModeHint,
+  urlField: tvUrlField,
+  tvUrlInput,
+  getLocale: () => appLocale,
+  setFeedback,
+});
+const pins = createPinsFeature({
+  pinGrid,
+  form,
+  urlInput,
+  labelInput,
+  savePinButton,
+  editPinsButton,
+  getLocale: () => appLocale,
+  canFocusFirstPin: () => !onboardingVisible,
+  setFeedback,
+  onUrlChange: () => void tvMode.sync(true),
+});
 
 function renderControllerStatus() {
   const { connected, enabled } = currentControllerState;
@@ -209,14 +220,15 @@ function setLocale(locale: AppLocale) {
   renderControllerStatus();
   renderControllerHints(currentBindings);
   renderOnboardingControls();
-  renderPins();
-  renderTvModeSettings();
+  pins.render();
+  tvMode.render();
   if (feedbackKey) feedback.textContent = translate(locale, feedbackKey, feedbackValues);
 }
 
 applyTranslations(document, appLocale);
 renderControllerHints(currentBindings);
 renderOnboardingControls();
+tvMode.render();
 const stopGamepadIconWatch = watchGamepadIconChanges((style) => {
   renderGamepadIconChoice(style);
   renderControllerHints(currentBindings);
@@ -289,273 +301,16 @@ void loadGamepadBindings()
   })
   .catch(() => {});
 
-function getInputHostname() {
-  const url = normalizeUrl(urlInput.value);
-  return url ? new URL(url).hostname.toLowerCase() : null;
-}
-
-function renderTvModeSettings() {
-  const hostname = currentTvHostname;
-  const hasSite = Boolean(hostname);
-  tvModeSettings.hidden = !hasSite;
-  tvModeEnabled.disabled = !hasSite;
-  tvUrlField.hidden = !hasSite || !tvModeEnabled.checked;
-
-  if (!hostname) {
-    tvModeHint.textContent = translate(appLocale, 'tvEnterAddress');
-  } else if (!tvModeEnabled.checked) {
-    tvModeHint.textContent = getBuiltInTvUrl(hostname)
-      ? translate(appLocale, 'tvYoutubeReady')
-      : translate(appLocale, 'tvModeOff');
-  } else if (tvUrlInput.value.trim()) {
-    tvModeHint.textContent = translate(appLocale, 'tvEveryVisit');
-  } else {
-    tvModeHint.textContent = translate(appLocale, 'tvAndroidProfile');
-  }
-}
-
-async function syncTvModeSettings(force = false) {
-  const hostname = getInputHostname();
-  if (!force && hostname === currentTvHostname) {
-    renderTvModeSettings();
-    return;
-  }
-
-  const sequence = ++tvProfileLoadSequence;
-  currentTvHostname = hostname;
-  currentTvProfile = null;
-  tvModeEnabled.checked = false;
-  tvModeEnabled.disabled = true;
-  tvUrlInput.value = '';
-  renderTvModeSettings();
-  if (!hostname) return;
-
-  try {
-    const profile = await loadTvModeProfile(hostname);
-    if (sequence !== tvProfileLoadSequence || getInputHostname() !== hostname) return;
-
-    currentTvProfile = profile;
-    const displayed = profile ?? createDefaultTvModeProfile(hostname);
-    tvModeEnabled.checked = displayed.enabled;
-    tvUrlInput.value = displayed.tvUrl;
-    tvModeEnabled.disabled = false;
-    renderTvModeSettings();
-  } catch {
-    if (sequence !== tvProfileLoadSequence) return;
-    tvModeHint.textContent = translate(appLocale, 'tvCouldNotLoad');
-  }
-}
-
-async function saveTvModeSettings(url: string) {
-  const hostname = new URL(url).hostname.toLowerCase();
-  if (hostname !== currentTvHostname || tvModeEnabled.disabled) await syncTvModeSettings(true);
-  if (hostname !== currentTvHostname || tvModeEnabled.disabled) return false;
-
-  const tvUrl = normalizeTvUrl(tvUrlInput.value, hostname);
-  if (tvUrl === null) {
-    setFeedback('tvSameHostname', {}, true);
-    tvUrlInput.focus();
-    return false;
-  }
-
-  const isCustomUrl = tvUrl !== getBuiltInTvUrl(hostname);
-  if (!currentTvProfile && !tvModeEnabled.checked && !isCustomUrl) return true;
-
-  try {
-    const response = (await chrome.runtime.sendMessage({
-      type: 'save-tv-mode-profile',
-      profile: { hostname, enabled: tvModeEnabled.checked, tvUrl },
-    })) as { ok?: boolean; error?: string } | undefined;
-
-    if (!response?.ok) {
-      setFeedback('tvCouldNotSave', {}, true);
-      return false;
-    }
-
-    currentTvProfile = { hostname, enabled: tvModeEnabled.checked, tvUrl };
-    return true;
-  } catch {
-    setFeedback('tvCouldNotSave', {}, true);
-    return false;
-  }
-}
-
-function displayHostname(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
-function monogram(label: string) {
-  return label
-    .split(/[\s.·-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
-}
-
-function createPin(site: PinnedSite) {
-  const card = document.createElement('article');
-  card.className = 'site-tile';
-
-  const launch = document.createElement('button');
-  launch.type = 'button';
-  launch.className = 'tile-launch';
-  launch.dataset.launch = site.id;
-  launch.setAttribute(
-    'aria-label',
-    translate(appLocale, 'openShortcut', {
-      label: site.label,
-      host: displayHostname(site.url),
-    }),
-  );
-
-  const mark = document.createElement('span');
-  mark.className = 'tile-mark';
-  mark.setAttribute('aria-hidden', 'true');
-  mark.textContent = monogram(site.label);
-
-  const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
-  faviconUrl.searchParams.set('pageUrl', site.url);
-  faviconUrl.searchParams.set('size', '32');
-  const favicon = document.createElement('img');
-  favicon.className = 'tile-favicon';
-  favicon.alt = '';
-  favicon.addEventListener('load', () => mark.replaceChildren(favicon), { once: true });
-  favicon.src = faviconUrl.toString();
-
-  const copy = document.createElement('span');
-  copy.className = 'tile-copy';
-  const name = document.createElement('span');
-  name.className = 'tile-name';
-  name.textContent = site.label;
-  const address = document.createElement('span');
-  address.className = 'tile-url';
-  address.textContent = displayHostname(site.url);
-  copy.append(name, address);
-  launch.append(mark, copy);
-  launch.addEventListener('click', () => window.location.assign(site.url));
-  card.append(launch);
-
-  if (editingPins) {
-    const tools = document.createElement('div');
-    tools.className = 'pin-tools';
-
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.className = 'pin-tool';
-    edit.textContent = translate(appLocale, 'edit');
-    edit.setAttribute('aria-label', translate(appLocale, 'editShortcut', { label: site.label }));
-    edit.addEventListener('click', () => editPin(site));
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'pin-tool';
-    remove.textContent = translate(appLocale, 'remove');
-    remove.setAttribute(
-      'aria-label',
-      translate(appLocale, 'removeShortcut', { label: site.label }),
-    );
-    remove.addEventListener('click', () => void removePin(site.id, site.label));
-
-    tools.append(edit, remove);
-    card.append(tools);
-  }
-
-  return card;
-}
-
-function renderPins(focusFirst = false) {
-  pinGrid.replaceChildren(...pinnedSites.map(createPin));
-  pinGrid.classList.toggle('is-editing', editingPins);
-  editPinsButton.textContent = translate(appLocale, editingPins ? 'done' : 'edit');
-
-  if (!pinnedSites.length) {
-    const empty = document.createElement('p');
-    empty.className = 'empty-pins';
-    empty.textContent = translate(appLocale, 'emptyShortcuts');
-    pinGrid.append(empty);
-  }
-
-  if (focusFirst && !onboardingVisible) {
-    const firstPin = pinGrid.querySelector<HTMLButtonElement>('[data-launch]');
-    if (firstPin) firstPin.focus({ preventScroll: true });
-    else urlInput.focus({ preventScroll: true });
-  }
-}
-
-function clearPinForm() {
-  editingPinId = null;
-  urlInput.value = '';
-  labelInput.value = '';
-  savePinButton.textContent = translate(appLocale, 'addShortcut');
-  void syncTvModeSettings(true);
-}
-
-function editPin(site: PinnedSite) {
-  editingPinId = site.id;
-  urlInput.value = site.url;
-  labelInput.value = site.label;
-  savePinButton.textContent = translate(appLocale, 'saveChanges');
-  setFeedback('feedbackEditingShortcut', { label: site.label });
-  void syncTvModeSettings(true);
-  document.querySelector('#site-form')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  urlInput.focus({ preventScroll: true });
-}
-
-async function removePin(id: string, label: string) {
-  const nextSites = pinnedSites.filter((site) => site.id !== id);
-  try {
-    await savePinnedSites(nextSites);
-  } catch {
-    setFeedback('feedbackCouldNotRemoveShortcut', {}, true);
-    return;
-  }
-  pinnedSites = nextSites;
-  if (editingPinId === id) clearPinForm();
-  renderPins();
-  setFeedback('feedbackShortcutRemoved', { label });
-}
-
 async function savePin() {
-  const url = normalizeUrl(urlInput.value);
-  if (!url) {
-    setFeedback('feedbackInvalidWebsite', {}, true);
-    urlInput.focus();
-    return;
-  }
+  const site = pins.readDraft();
+  if (!site) return;
 
-  const duplicate = pinnedSites.find((site) => site.url === url && site.id !== editingPinId);
-  if (duplicate) {
-    setFeedback('feedbackDuplicateShortcut', { label: duplicate.label }, true);
-    return;
-  }
+  const tvModeResult = await tvMode.saveForUrl(site.url);
+  if (tvModeResult === 'failed') return;
 
-  if (!(await saveTvModeSettings(url))) return;
-
-  const site: PinnedSite = {
-    id: editingPinId ?? crypto.randomUUID(),
-    label: labelInput.value.trim() || displayHostname(url),
-    url,
-  };
-
-  const nextSites = editingPinId
-    ? pinnedSites.map((current) => (current.id === site.id ? site : current))
-    : [...pinnedSites, site];
-
-  try {
-    await savePinnedSites(nextSites);
-    pinnedSites = nextSites;
-    renderPins();
-    clearPinForm();
-    setFeedback('feedbackShortcutSaved', { label: site.label });
-  } catch {
-    setFeedback('feedbackCouldNotSaveShortcut', {}, true);
-  }
+  const saved = await pins.save(site);
+  if (!saved && tvModeResult === 'saved')
+    setFeedback('feedbackCouldNotSaveShortcutTvModeSaved', { label: site.label }, true);
 }
 
 async function goToAddress() {
@@ -565,7 +320,7 @@ async function goToAddress() {
     urlInput.focus();
     return;
   }
-  if (!(await saveTvModeSettings(url))) return;
+  if ((await tvMode.saveForUrl(url)) === 'failed') return;
   window.location.assign(url);
 }
 
@@ -642,9 +397,7 @@ function handleGamepadState(state: GamepadState) {
 }
 
 editPinsButton.addEventListener('click', () => {
-  editingPins = !editingPins;
-  if (!editingPins) clearPinForm();
-  renderPins();
+  pins.toggleEditing();
 });
 
 form.addEventListener('submit', (event) => {
@@ -652,16 +405,11 @@ form.addEventListener('submit', (event) => {
   void goToAddress();
 });
 
-urlInput.addEventListener('input', () => void syncTvModeSettings());
-tvModeEnabled.addEventListener('change', renderTvModeSettings);
+urlInput.addEventListener('input', () => void tvMode.sync());
+tvModeEnabled.addEventListener('change', tvMode.render);
 savePinButton.addEventListener('click', () => void savePin());
 
-void loadPinnedSites()
-  .then((sites) => {
-    pinnedSites = sites;
-    renderPins(true);
-  })
-  .catch(() => setFeedback('feedbackCouldNotLoadShortcuts', {}, true));
+void pins.load();
 
 const stopGamepad = startGamepadController({
   onAction: handleGamepadAction,

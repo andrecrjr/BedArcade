@@ -114,6 +114,13 @@ export default defineContentScript({
       });
     }
 
+    function focusTarget(target: HTMLElement) {
+      const activeBefore = document.activeElement;
+      selected = target;
+      target.focus({ preventScroll: true });
+      if (document.activeElement === activeBefore) draw();
+    }
+
     document.addEventListener('focusin', (event) => {
       const target = event.target;
       if (target instanceof HTMLElement) {
@@ -122,17 +129,16 @@ export default defineContentScript({
       }
     });
 
-    function move(direction: Direction) {
+    function move(direction: Direction): boolean {
       if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
         selected = document.activeElement;
       if (activeSelectPicker?.open) {
         const target = nearest(selected, direction);
         if (target) {
-          selected = target;
-          target.focus({ preventScroll: true });
-          draw();
+          focusTarget(target);
+          return true;
         }
-        return;
+        return false;
       }
       const keyboard = document.querySelector<HTMLElement>('[data-gamepad-navigator="keyboard"]');
       if (
@@ -143,24 +149,22 @@ export default defineContentScript({
       ) {
         const firstKey = keyboard.querySelector<HTMLButtonElement>('[data-key="q"]');
         if (firstKey) {
-          selected = firstKey;
-          firstKey.focus({ preventScroll: true });
-          draw();
-          return;
+          focusTarget(firstKey);
+          return true;
         }
       }
 
       const target = nearest(selected, direction);
       if (target) {
-        selected = target;
-        target.focus({ preventScroll: true });
-        draw();
+        focusTarget(target);
+        return true;
       } else {
         window.scrollBy({
           top: direction === 'down' ? 250 : direction === 'up' ? -250 : 0,
           left: direction === 'right' ? 250 : direction === 'left' ? -250 : 0,
           behavior: 'smooth',
         });
+        return false;
       }
     }
 
@@ -196,7 +200,8 @@ export default defineContentScript({
     window.addEventListener('resize', draw);
     const stopGamepad = startGamepadController({
       onAction(action) {
-        if (action.type === 'move') move(action.direction);
+        let outlineUpdated = false;
+        if (action.type === 'move') outlineUpdated = move(action.direction);
         else if (action.type === 'scroll') window.scrollBy(0, action.amount);
         else if (action.type === 'activate') activate();
         else if (action.type === 'submit') submitForm(selected);
@@ -208,8 +213,11 @@ export default defineContentScript({
         else if (action.type === 'previous-tab') sendTabAction('prev-tab');
         else if (action.type === 'next-tab') sendTabAction('next-tab');
         else if (action.type === 'new-tab') sendTabAction('new-tab');
-        if (!selected || !selected.isConnected) selected = candidates()[0] ?? null;
-        draw();
+        if (!selected || !selected.isConnected) {
+          selected = candidates()[0] ?? null;
+          outlineUpdated = false;
+        }
+        if (!outlineUpdated) draw();
       },
       onStateChange(state) {
         setActiveGamepadId(state.gamepadId);

@@ -450,6 +450,42 @@ test('adds, edits, and removes pins while preserving changes after reload', asyn
   await expect(page.getByRole('button', { name: /open alpha games/i })).toHaveCount(0);
 });
 
+test('reports TV settings saved when saving the shortcut fails', async ({ context }) => {
+  const page = await openNewTab(context);
+  await page.evaluate(() => {
+    const storage = chrome.storage.local;
+    const originalSet = storage.set.bind(storage);
+    Object.defineProperty(storage, 'set', {
+      configurable: true,
+      value: async (items: Record<string, unknown>) => {
+        if ('pinnedSites' in items) throw new Error('Injected shortcut storage failure');
+        return originalSet(items);
+      },
+    });
+  });
+
+  await page.locator('#site-url').fill('https://alpha.test/arcade');
+  await expect(page.locator('#tv-mode-enabled')).toBeEnabled();
+  await page.locator('#tv-mode-enabled').check();
+  await page.locator('#tv-url').fill('https://alpha.test/tv');
+  await page.locator('#site-label').fill('Alpha Arcade');
+  await page.getByRole('button', { name: 'Add shortcut' }).click();
+
+  await expect(page.locator('#feedback')).toContainText(
+    'TV settings were saved, but the shortcut could not be saved',
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const profiles = (await chrome.storage.local.get('tvModeProfiles')).tvModeProfiles as
+          | { hostname: string; enabled: boolean; tvUrl: string }[]
+          | undefined;
+        return profiles?.find((profile) => profile.hostname === 'alpha.test');
+      }),
+    )
+    .toEqual({ hostname: 'alpha.test', enabled: true, tvUrl: 'https://alpha.test/tv' });
+});
+
 test('renders Chromium’s favicon fallback before using the cached site favicon', async ({
   context,
 }) => {
