@@ -10,6 +10,7 @@ import {
 import { loadPinnedSites, savePinnedSites, type PinnedSite } from '../../lib/pins';
 import { attachFloatingKeyboard } from '../../lib/floating-keyboard';
 import { nearest } from '../../lib/spatial';
+import { showSelectPicker } from '../../lib/select-picker';
 import { sendTabAction } from '../../lib/tab-actions';
 import {
   createDefaultTvModeProfile,
@@ -67,6 +68,7 @@ let appLocale: AppLocale = detectAppLocale();
 let pinnedSites: PinnedSite[] = [];
 let currentBindings = DEFAULT_GAMEPAD_BINDINGS;
 let currentControllerState = { connected: false, enabled: true };
+let activeSelectPicker: HTMLDialogElement | null = null;
 let editingPins = false;
 let editingPinId: string | null = null;
 let currentTvHostname: string | null = null;
@@ -522,7 +524,22 @@ async function goToAddress() {
 
 function activateFocusedElement() {
   const active = document.activeElement;
-  if (active instanceof HTMLElement && active !== document.body) active.click();
+  if (!(active instanceof HTMLElement) || active === document.body) return;
+  active.focus({ preventScroll: true });
+  active.click();
+  if (active instanceof HTMLSelectElement && active.isConnected) {
+    const picker = showSelectPicker(active, appLocale);
+    if (!picker) return;
+    activeSelectPicker = picker.dialog;
+    picker.dialog.addEventListener(
+      'close',
+      () => {
+        if (activeSelectPicker === picker.dialog) activeSelectPicker = null;
+        if (active.isConnected) active.focus({ preventScroll: true });
+      },
+      { once: true },
+    );
+  }
 }
 
 function moveFocus(direction: 'up' | 'down' | 'left' | 'right') {
@@ -555,8 +572,10 @@ function handleGamepadAction(action: GamepadAction) {
   if (action.type === 'move') moveFocus(action.direction);
   else if (action.type === 'activate') activateFocusedElement();
   else if (action.type === 'scroll') window.scrollBy(0, action.amount);
-  else if (action.type === 'back') void currentTabId.then((id) => sendTabAction('back', id));
-  else if (action.type === 'refresh') window.location.reload();
+  else if (action.type === 'back') {
+    if (activeSelectPicker?.open) activeSelectPicker.close('cancel');
+    else void currentTabId.then((id) => sendTabAction('back', id));
+  } else if (action.type === 'refresh') window.location.reload();
   else if (action.type === 'previous-tab')
     void currentTabId.then((id) => sendTabAction('prev-tab', id));
   else if (action.type === 'next-tab')

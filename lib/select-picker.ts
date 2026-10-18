@@ -113,3 +113,21 @@ export function createSelectPicker(select: HTMLSelectElement, locale: AppLocale)
   dialog.append(heading, hint, list);
   return enabledButtons.length ? dialog : null;
 }
+
+export function showSelectPicker(select: HTMLSelectElement, locale: AppLocale) {
+  const dialog = createSelectPicker(select, locale);
+  if (!dialog) return null;
+
+  const selectedOption = dialog.querySelector<HTMLButtonElement>(
+    `[data-option-index="${select.selectedIndex}"]`,
+  );
+  const firstEnabledOption = dialog.querySelector<HTMLButtonElement>('button:not(:disabled)');
+  const initialOption =
+    selectedOption && !selectedOption.disabled ? selectedOption : firstEnabledOption;
+  if (!initialOption) return null;
+
+  document.body.append(dialog);
+  dialog.showModal();
+  initialOption.focus({ preventScroll: true });
+  return { dialog, initialOption };
+}

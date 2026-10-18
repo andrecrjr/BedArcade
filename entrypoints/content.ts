@@ -1,7 +1,7 @@
 import { candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
 import { attachFloatingKeyboard } from '../lib/floating-keyboard';
-import { createSelectPicker } from '../lib/select-picker';
+import { showSelectPicker } from '../lib/select-picker';
 import { sendTabAction } from '../lib/tab-actions';
 import {
   detectAppLocale,
@@ -164,13 +164,13 @@ export default defineContentScript({
     }
 
     function openSelectPicker(select: HTMLSelectElement) {
-      const picker = createSelectPicker(select, appLocale);
+      const picker = showSelectPicker(select, appLocale);
       if (!picker) return;
-      activeSelectPicker = picker;
-      picker.addEventListener(
+      activeSelectPicker = picker.dialog;
+      picker.dialog.addEventListener(
         'close',
         () => {
-          if (activeSelectPicker === picker) activeSelectPicker = null;
+          if (activeSelectPicker === picker.dialog) activeSelectPicker = null;
           if (select.isConnected) {
             selected = select;
             select.focus({ preventScroll: true });
@@ -179,18 +179,7 @@ export default defineContentScript({
         },
         { once: true },
       );
-      document.body.append(picker);
-      picker.showModal();
-      const selectedOption = picker.querySelector<HTMLButtonElement>(
-        `[data-option-index="${select.selectedIndex}"]`,
-      );
-      const firstEnabledOption = picker.querySelector<HTMLButtonElement>('button:not(:disabled)');
-      const initialOption =
-        selectedOption && !selectedOption.disabled ? selectedOption : firstEnabledOption;
-      if (initialOption) {
-        selected = initialOption;
-        initialOption.focus({ preventScroll: true });
-      }
+      selected = picker.initialOption;
     }
 
     function activate() {
