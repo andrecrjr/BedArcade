@@ -1,0 +1,315 @@
+use std::time::Duration;
+
+use gamepad_desktop::control::{
+    Action, Button, ControlSettings, GamepadFrame, MouseButton, MouseController, SystemKey,
+};
+
+const TICK: Duration = Duration::from_millis(10);
+
+fn ready() -> (MouseController, ControlSettings) {
+    let mut controller = MouseController::default();
+    let mut settings = ControlSettings::default();
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    (controller, settings)
+}
+
+fn pressed(button: Button) -> GamepadFrame {
+    let mut frame = GamepadFrame::default();
+    frame.buttons[button as usize] = true;
+    frame
+}
+
+#[test]
+fn stick_drift_and_invalid_axes_do_not_move_the_pointer() {
+    let (mut controller, mut settings) = ready();
+    let frame = GamepadFrame {
+        x: 0.1,
+        y: -0.1,
+        scroll: f64::NAN,
+        ..Default::default()
+    };
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+}
+
+#[test]
+fn movement_is_independent_of_poll_rate_and_keeps_small_movements() {
+    fn distance(ticks: usize, tick_ms: u64, x: f64) -> i32 {
+        let (mut controller, mut settings) = ready();
+        let frame = GamepadFrame {
+            x,
+            ..Default::default()
+        };
+        (0..ticks)
+            .flat_map(|_| {
+                controller.update(Some(&frame), Duration::from_millis(tick_ms), &mut settings)
+            })
+            .map(|action| match action {
+                Action::Move(x, _) => x,
+                _ => 0,
+            })
+            .sum()
+    }
+    assert!((distance(100, 10, 1.0) - distance(50, 20, 1.0)).abs() <= 1);
+    assert!(distance(100, 10, 0.3) > 0);
+    assert!(distance(100, 10, 0.3) < distance(100, 10, 1.0));
+}
+
+#[test]
+fn holding_a_drags_and_release_ends_the_click() {
+    let (mut controller, mut settings) = ready();
+    let mut frame = pressed(Button::South);
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, true)]
+    );
+    frame.x = 1.0;
+    let actions = controller.update(Some(&frame), TICK, &mut settings);
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Move(x, 0) if *x > 0))
+    );
+    assert!(
+        !actions
+            .iter()
+            .any(|action| matches!(action, Action::Mouse(_, _)))
+    );
+    assert_eq!(
+        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, false)]
+    );
+}
+
+#[test]
+fn disconnect_releases_buttons_and_reconnect_requires_neutral() {
+    let (mut controller, mut settings) = ready();
+    let frame = pressed(Button::South);
+    controller.update(Some(&frame), TICK, &mut settings);
+    assert_eq!(
+        controller.update(None, TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, false)]
+    );
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, true)]
+    );
+}
+
+#[test]
+fn start_pauses_releases_drag_and_does_not_repeat_while_held() {
+    let (mut controller, mut settings) = ready();
+    controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
+    let mut frame = pressed(Button::Start);
+    frame.buttons[Button::South as usize] = true;
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, false)]
+    );
+    assert!(!settings.enabled);
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+    assert!(!settings.enabled);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.update(Some(&frame), TICK, &mut settings);
+    assert!(settings.enabled);
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+}
+
+#[test]
+fn gui_pause_also_releases_a_held_button() {
+    let (mut controller, mut settings) = ready();
+    let frame = pressed(Button::East);
+    controller.update(Some(&frame), TICK, &mut settings);
+    settings.enabled = false;
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Right, false)]
+    );
+}
+
+#[test]
+fn r3_opens_launcher_once_and_shoulders_navigate_apps() {
+    let (mut controller, mut settings) = ready();
+    let frame = pressed(Button::RightStick);
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Key(SystemKey::Meta)]
+    );
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+    assert_eq!(
+        controller.update(Some(&pressed(Button::West)), TICK, &mut settings),
+        vec![Action::Key(SystemKey::Enter)]
+    );
+    assert_eq!(
+        controller.update(Some(&pressed(Button::RightShoulder)), TICK, &mut settings),
+        vec![Action::NextWindow]
+    );
+    assert_eq!(
+        controller.update(Some(&pressed(Button::LeftShoulder)), TICK, &mut settings),
+        vec![Action::Key(SystemKey::Tab)]
+    );
+}
+
+#[test]
+fn dpad_repeats_after_delay_without_repeating_confirm() {
+    let (mut controller, mut settings) = ready();
+    let mut frame = pressed(Button::Down);
+    frame.buttons[Button::West as usize] = true;
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::Key(SystemKey::Enter), Action::Key(SystemKey::Down)]
+    );
+    for _ in 0..20 {
+        assert!(
+            controller
+                .update(Some(&frame), TICK, &mut settings)
+                .is_empty()
+        );
+    }
+    let repeated: Vec<_> = (0..30)
+        .flat_map(|_| controller.update(Some(&frame), TICK, &mut settings))
+        .collect();
+    assert!(!repeated.is_empty());
+    assert!(
+        repeated
+            .iter()
+            .all(|action| *action == Action::Key(SystemKey::Down))
+    );
+}
+
+#[test]
+fn l3_opens_system_keyboard_without_disabling_mouse_control() {
+    let (mut controller, mut settings) = ready();
+    let mut frame = GamepadFrame {
+        x: 1.0,
+        ..Default::default()
+    };
+    frame.buttons[Button::LeftStick as usize] = true;
+
+    let actions = controller.update(Some(&frame), TICK, &mut settings);
+
+    assert!(controller.keyboard.open);
+    assert!(actions.contains(&Action::OnScreenKeyboard(true)));
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Move(_, _)))
+    );
+}
+
+#[test]
+fn native_gamepad_keyboard_mode_does_not_inject_duplicate_mouse_movement() {
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    assert!(
+        controller
+            .update(Some(&pressed(Button::LeftStick)), TICK, &mut settings)
+            .contains(&Action::OnScreenKeyboard(true))
+    );
+    let frame = GamepadFrame {
+        x: 1.0,
+        ..pressed(Button::Start)
+    };
+
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+    assert!(settings.enabled);
+}
+
+#[test]
+fn scroll_and_pointer_do_not_jump_after_a_stall() {
+    let (mut controller, mut settings) = ready();
+    let frame = GamepadFrame {
+        x: 1.0,
+        scroll: 1.0,
+        ..Default::default()
+    };
+    let actions = controller.update(Some(&frame), Duration::from_secs(60), &mut settings);
+    assert!(
+        actions
+            .iter()
+            .all(|action| !matches!(action, Action::Move(x, _) if *x > 100))
+    );
+    let actions: Vec<_> = (0..20)
+        .flat_map(|_| controller.update(Some(&frame), TICK, &mut settings))
+        .collect();
+    assert!(
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Scroll(amount) if *amount > 0))
+    );
+}
+
+#[test]
+fn l3_toggles_keyboard_once_and_releases_drag() {
+    let (mut controller, mut settings) = ready();
+    controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
+    let frame = pressed(Button::LeftStick);
+    let actions = controller.update(Some(&frame), TICK, &mut settings);
+    assert!(actions.contains(&Action::OnScreenKeyboard(true)));
+    assert!(actions.contains(&Action::Mouse(MouseButton::Left, false)));
+    assert!(controller.keyboard.open);
+    assert!(
+        controller
+            .update(Some(&frame), TICK, &mut settings)
+            .is_empty()
+    );
+    assert!(controller.keyboard.open);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&frame), TICK, &mut settings),
+        vec![Action::OnScreenKeyboard(false)]
+    );
+    assert!(!controller.keyboard.open);
+}
+
+#[test]
+fn pause_and_disconnect_request_system_keyboard_close() {
+    for disconnect in [false, true] {
+        let (mut controller, mut settings) = ready();
+        let open_actions =
+            controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+        assert!(open_actions.contains(&Action::OnScreenKeyboard(true)));
+        let pause = pressed(Button::Start);
+        let frame = if disconnect { None } else { Some(&pause) };
+        let actions = controller.update(frame, TICK, &mut settings);
+        assert!(actions.contains(&Action::OnScreenKeyboard(false)));
+        assert!(!controller.keyboard.open);
+    }
+}
+
+#[test]
+fn l3_cannot_open_keyboard_when_paused_or_connecting_with_it_held() {
+    let mut controller = MouseController::default();
+    let mut settings = ControlSettings::default();
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    assert!(!controller.keyboard.open);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    settings.enabled = false;
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    assert!(!controller.keyboard.open);
+}

@@ -1,0 +1,30 @@
+[package]
+name = "gamepad-desktop"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["bundled-sdl"]
+bundled-sdl = ["sdl3/build-from-source-static", "sdl3/build-from-source-unix-console"]
+
+[dependencies]
+tray-icon = { version = "0.26.1", default-features = false, features = ["ksni"] }
+sdl3 = "0.20.0"
+sdl3-sys = { version = "0.7.1", features = ["no-default-subsystems", "sdl-joystick", "sdl-hidapi", "sdl-power", "sdl-sensor"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.13.2"
+bytemuck = "1.25"
+egui-overlay = { package = "egui", version = "0.34", default-features = false, features = ["default_fonts"] }
+egui_software_backend = { version = "0.0.3", default-features = false, features = ["std"] }
+rustix = { version = "1.1.5", features = ["event"] }
+smithay-client-toolkit = "0.19.2"
+wayland-client = "0.31"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+enigo = { version = "0.6.1", default-features = false }
+
+[dependencies.eframe]
+version = "0.37"
+default-features = false
+features = ["accesskit", "default_fonts", "glow", "wayland", "x11"]

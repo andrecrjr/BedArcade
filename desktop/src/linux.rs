@@ -1,0 +1,247 @@
+use evdev::{
+    AttributeSet, EventType, InputEvent, KeyCode, RelativeAxisCode as Relative,
+    uinput::VirtualDevice,
+};
+use std::env;
+
+use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
+use crate::{
+    keyboard::{KeyboardPresentation, KeyboardSession},
+    wayland_keyboard::WaylandKeyboardOverlay,
+};
+
+#[cfg(test)]
+#[path = "linux_tests.rs"]
+mod tests;
+
+pub struct Platform {
+    pointer: VirtualDevice,
+    keyboard: VirtualDevice,
+    keyboard_overlay: Option<WaylandKeyboardOverlay>,
+    keyboard_presentation: KeyboardPresentation,
+    keyboard_overlay_error: Option<String>,
+}
+
+impl Platform {
+    pub fn new() -> Result<Self, String> {
+        let create = || -> std::io::Result<Self> {
+            let mouse_keys: AttributeSet<KeyCode> = [KeyCode::BTN_LEFT, KeyCode::BTN_RIGHT]
+                .into_iter()
+                .collect();
+            let relative: AttributeSet<Relative> =
+                [Relative::REL_X, Relative::REL_Y, Relative::REL_WHEEL]
+                    .into_iter()
+                    .collect();
+            let keys: AttributeSet<KeyCode> = (KeyCode::KEY_ESC.0..=KeyCode::KEY_MICMUTE.0)
+                .map(KeyCode)
+                .collect();
+            let pointer = VirtualDevice::builder()?
+                .name("Gamepad Navigator Mouse")
+                .with_keys(&mouse_keys)?
+                .with_relative_axes(&relative)?
+                .build()?;
+            let keyboard = VirtualDevice::builder()?
+                .name("Gamepad Navigator Keyboard")
+                .with_keys(&keys)?
+                .build()?;
+            let is_wayland = env::var_os("WAYLAND_DISPLAY").is_some()
+                || env::var("XDG_SESSION_TYPE")
+                    .is_ok_and(|session| session.eq_ignore_ascii_case("wayland"));
+            let (keyboard_overlay, keyboard_presentation, keyboard_overlay_error) = if is_wayland {
+                match WaylandKeyboardOverlay::new() {
+                    Ok(overlay) => (Some(overlay), KeyboardPresentation::WaylandLayer, None),
+                    Err(error) => (None, KeyboardPresentation::Unavailable, Some(error)),
+                }
+            } else {
+                (None, KeyboardPresentation::Viewport, None)
+            };
+            Ok(Self {
+                pointer,
+                keyboard,
+                keyboard_overlay,
+                keyboard_presentation,
+                keyboard_overlay_error,
+            })
+        };
+        create().map_err(|error| format!("Não foi possível criar mouse/teclado virtual em /dev/uinput: {error}. Verifique as permissões da sua sessão."))
+    }
+
+    pub fn system_keyboard_uses_gamepad(&self) -> bool {
+        true
+    }
+
+    pub fn keyboard_presentation(&self) -> KeyboardPresentation {
+        self.keyboard_presentation
+    }
+
+    pub fn keyboard_overlay_error(&self) -> Option<&str> {
+        self.keyboard_overlay_error.as_deref()
+    }
+
+    pub fn update_keyboard_overlay(&mut self, session: &KeyboardSession) -> Result<(), String> {
+        let Some(overlay) = &mut self.keyboard_overlay else {
+            return Ok(());
+        };
+        if let Err(error) = overlay.update(session) {
+            self.keyboard_overlay = None;
+            self.keyboard_presentation = KeyboardPresentation::Unavailable;
+            self.keyboard_overlay_error = Some(error.clone());
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub fn apply(&mut self, action: Action) -> Result<(), String> {
+        let key_event = |key: KeyCode, value| InputEvent::new(EventType::KEY.0, key.0, value);
+        let result = match action {
+            Action::OnScreenKeyboard(_) => return Ok(()),
+            Action::Move(x, y) => self.pointer.emit(&[
+                InputEvent::new(EventType::RELATIVE.0, Relative::REL_X.0, x),
+                InputEvent::new(EventType::RELATIVE.0, Relative::REL_Y.0, y),
+            ]),
+            Action::Scroll(amount) => self.pointer.emit(&[InputEvent::new(
+                EventType::RELATIVE.0,
+                Relative::REL_WHEEL.0,
+                -amount,
+            )]),
+            Action::Mouse(button, pressed) => self.pointer.emit(&[key_event(
+                match button {
+                    MouseButton::Left => KeyCode::BTN_LEFT,
+                    MouseButton::Right => KeyCode::BTN_RIGHT,
+                },
+                i32::from(pressed),
+            )]),
+            Action::Key(key) => {
+                let code = match key {
+                    SystemKey::Enter => KeyCode::KEY_ENTER,
+                    SystemKey::Escape => KeyCode::KEY_ESC,
+                    SystemKey::Up => KeyCode::KEY_UP,
+                    SystemKey::Down => KeyCode::KEY_DOWN,
+                    SystemKey::Left => KeyCode::KEY_LEFT,
+                    SystemKey::Right => KeyCode::KEY_RIGHT,
+                    SystemKey::Tab => KeyCode::KEY_TAB,
+                    SystemKey::Meta => KeyCode::KEY_LEFTMETA,
+                };
+                self.emit_key(code)
+            }
+            Action::Keyboard(input) => self.emit_keyboard_input(input),
+            Action::NextWindow => {
+                let press = self.keyboard.emit(&[
+                    key_event(KeyCode::KEY_LEFTALT, 1),
+                    key_event(KeyCode::KEY_TAB, 1),
+                ]);
+                let release = self.keyboard.emit(&[
+                    key_event(KeyCode::KEY_TAB, 0),
+                    key_event(KeyCode::KEY_LEFTALT, 0),
+                ]);
+                press.and(release)
+            }
+        };
+        result.map_err(|error| format!("Erro enviando entrada ao desktop: {error}"))
+    }
+
+    fn emit_key(&mut self, key: KeyCode) -> std::io::Result<()> {
+        self.keyboard.emit(&[
+            InputEvent::new(EventType::KEY.0, key.0, 1),
+            InputEvent::new(EventType::KEY.0, key.0, 0),
+        ])
+    }
+
+    fn emit_keyboard_input(&mut self, input: KeyboardInput) -> std::io::Result<()> {
+        let (key, shifted) = match input {
+            KeyboardInput::Character(character) => ascii_key(character)
+                .ok_or_else(|| std::io::Error::other("caractere não suportado"))?,
+            KeyboardInput::Backspace => (KeyCode::KEY_BACKSPACE, false),
+            KeyboardInput::Enter => (KeyCode::KEY_ENTER, false),
+            KeyboardInput::Escape => (KeyCode::KEY_ESC, false),
+            KeyboardInput::Space => (KeyCode::KEY_SPACE, false),
+            KeyboardInput::Tab => (KeyCode::KEY_TAB, false),
+        };
+        let press = |code: KeyCode| InputEvent::new(EventType::KEY.0, code.0, 1);
+        let release = |code: KeyCode| InputEvent::new(EventType::KEY.0, code.0, 0);
+
+        if shifted {
+            self.keyboard.emit(&[
+                press(KeyCode::KEY_LEFTSHIFT),
+                press(key),
+                release(key),
+                release(KeyCode::KEY_LEFTSHIFT),
+            ])
+        } else {
+            self.keyboard.emit(&[press(key), release(key)])
+        }
+    }
+}
+
+fn ascii_key(character: char) -> Option<(KeyCode, bool)> {
+    let (code, shifted) = match character {
+        'a' | 'A' => (KeyCode::KEY_A, character.is_ascii_uppercase()),
+        'b' | 'B' => (KeyCode::KEY_B, character.is_ascii_uppercase()),
+        'c' | 'C' => (KeyCode::KEY_C, character.is_ascii_uppercase()),
+        'd' | 'D' => (KeyCode::KEY_D, character.is_ascii_uppercase()),
+        'e' | 'E' => (KeyCode::KEY_E, character.is_ascii_uppercase()),
+        'f' | 'F' => (KeyCode::KEY_F, character.is_ascii_uppercase()),
+        'g' | 'G' => (KeyCode::KEY_G, character.is_ascii_uppercase()),
+        'h' | 'H' => (KeyCode::KEY_H, character.is_ascii_uppercase()),
+        'i' | 'I' => (KeyCode::KEY_I, character.is_ascii_uppercase()),
+        'j' | 'J' => (KeyCode::KEY_J, character.is_ascii_uppercase()),
+        'k' | 'K' => (KeyCode::KEY_K, character.is_ascii_uppercase()),
+        'l' | 'L' => (KeyCode::KEY_L, character.is_ascii_uppercase()),
+        'm' | 'M' => (KeyCode::KEY_M, character.is_ascii_uppercase()),
+        'n' | 'N' => (KeyCode::KEY_N, character.is_ascii_uppercase()),
+        'o' | 'O' => (KeyCode::KEY_O, character.is_ascii_uppercase()),
+        'p' | 'P' => (KeyCode::KEY_P, character.is_ascii_uppercase()),
+        'q' | 'Q' => (KeyCode::KEY_Q, character.is_ascii_uppercase()),
+        'r' | 'R' => (KeyCode::KEY_R, character.is_ascii_uppercase()),
+        's' | 'S' => (KeyCode::KEY_S, character.is_ascii_uppercase()),
+        't' | 'T' => (KeyCode::KEY_T, character.is_ascii_uppercase()),
+        'u' | 'U' => (KeyCode::KEY_U, character.is_ascii_uppercase()),
+        'v' | 'V' => (KeyCode::KEY_V, character.is_ascii_uppercase()),
+        'w' | 'W' => (KeyCode::KEY_W, character.is_ascii_uppercase()),
+        'x' | 'X' => (KeyCode::KEY_X, character.is_ascii_uppercase()),
+        'y' | 'Y' => (KeyCode::KEY_Y, character.is_ascii_uppercase()),
+        'z' | 'Z' => (KeyCode::KEY_Z, character.is_ascii_uppercase()),
+        '1' => (KeyCode::KEY_1, false),
+        '2' => (KeyCode::KEY_2, false),
+        '3' => (KeyCode::KEY_3, false),
+        '4' => (KeyCode::KEY_4, false),
+        '5' => (KeyCode::KEY_5, false),
+        '6' => (KeyCode::KEY_6, false),
+        '7' => (KeyCode::KEY_7, false),
+        '8' => (KeyCode::KEY_8, false),
+        '9' => (KeyCode::KEY_9, false),
+        '0' => (KeyCode::KEY_0, false),
+        '!' => (KeyCode::KEY_1, true),
+        '@' => (KeyCode::KEY_2, true),
+        '#' => (KeyCode::KEY_3, true),
+        '$' => (KeyCode::KEY_4, true),
+        '%' => (KeyCode::KEY_5, true),
+        '^' => (KeyCode::KEY_6, true),
+        '&' => (KeyCode::KEY_7, true),
+        '*' => (KeyCode::KEY_8, true),
+        '(' => (KeyCode::KEY_9, true),
+        ')' => (KeyCode::KEY_0, true),
+        '-' => (KeyCode::KEY_MINUS, false),
+        '_' => (KeyCode::KEY_MINUS, true),
+        '=' => (KeyCode::KEY_EQUAL, false),
+        '+' => (KeyCode::KEY_EQUAL, true),
+        '\\' => (KeyCode::KEY_BACKSLASH, false),
+        '|' => (KeyCode::KEY_BACKSLASH, true),
+        '[' => (KeyCode::KEY_LEFTBRACE, false),
+        '{' => (KeyCode::KEY_LEFTBRACE, true),
+        ']' => (KeyCode::KEY_RIGHTBRACE, false),
+        '}' => (KeyCode::KEY_RIGHTBRACE, true),
+        ';' => (KeyCode::KEY_SEMICOLON, false),
+        ':' => (KeyCode::KEY_SEMICOLON, true),
+        '\'' => (KeyCode::KEY_APOSTROPHE, false),
+        '"' => (KeyCode::KEY_APOSTROPHE, true),
+        ',' => (KeyCode::KEY_COMMA, false),
+        '<' => (KeyCode::KEY_COMMA, true),
+        '.' => (KeyCode::KEY_DOT, false),
+        '>' => (KeyCode::KEY_DOT, true),
+        '/' => (KeyCode::KEY_SLASH, false),
+        '?' => (KeyCode::KEY_SLASH, true),
+        _ => return None,
+    };
+    Some((code, shifted))
+}
