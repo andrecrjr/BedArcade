@@ -186,6 +186,8 @@ impl Gamepads {
             x: normalize(gamepad.axis(Axis::LeftX)),
             y: normalize(gamepad.axis(Axis::LeftY)),
             scroll: normalize(gamepad.axis(Axis::RightY)),
+            left_trigger: normalize_trigger(gamepad.axis(Axis::TriggerLeft)),
+            right_trigger: normalize_trigger(gamepad.axis(Axis::TriggerRight)),
             ..Default::default()
         };
         for (button, native) in [
@@ -211,6 +213,10 @@ impl Gamepads {
 
 fn normalize(value: i16) -> f64 {
     f64::from(value) / if value < 0 { 32768.0 } else { 32767.0 }
+}
+
+fn normalize_trigger(value: i16) -> f64 {
+    (f64::from(value).max(0.0) / f64::from(i16::MAX)).clamp(0.0, 1.0)
 }
 
 fn profile_path() -> Option<PathBuf> {

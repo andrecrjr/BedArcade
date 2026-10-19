@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, RichText};
 use gamepad_desktop::runtime::DesktopRuntime;
 use gamepad_desktop::tray::{PanelControl, TrayAction, create_tray};
 use gamepad_desktop::{
-    control::{KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS},
+    control::{ITEM_SHORTCUTS, KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS, NavigationMode},
     keyboard::{self, KeyboardPosition, KeyboardPresentation, KeyboardSession},
 };
 use std::{
@@ -71,7 +71,10 @@ impl eframe::App for GamepadNavigatorApp {
                     ui.label(if state.keyboard.open {
                         "Teclado visual próprio · direcional move · A digita · R3 fecha"
                     } else if state.settings.enabled {
-                        "Modo mouse · solte os botões e centralize os analógicos ao conectar/retomar"
+                        match state.mode {
+                            NavigationMode::Mouse => "Modo mouse · solte os botões e centralize os analógicos ao conectar/retomar",
+                            NavigationMode::Items => "Navegação por itens · direcional ou analógico esquerdo move o foco",
+                        }
                     } else {
                         "Pausado · pressione Start para retomar"
                     });
@@ -81,8 +84,14 @@ impl eframe::App for GamepadNavigatorApp {
                 }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new(if state.keyboard.open { "TECLADO VISUAL" } else if state.settings.enabled { "MOUSE" } else { "PAUSADO" }).strong().size(20.0).color(Color32::LIGHT_GREEN));
+                    ui.label(RichText::new(if state.keyboard.open { "TECLADO VISUAL" } else if !state.settings.enabled { "PAUSADO" } else { match state.mode { NavigationMode::Mouse => "MOUSE", NavigationMode::Items => "ITENS" } }).strong().size(20.0).color(Color32::LIGHT_GREEN));
                 });
+                if state.settings.enabled
+                    && state.mode == NavigationMode::Items
+                    && let Some(status) = &state.item_status
+                {
+                    ui.small(status);
+                }
                 if state.keyboard.presentation != KeyboardPresentation::Unavailable
                     && let Some(status) = &state.keyboard.status
                 {
@@ -98,7 +107,14 @@ impl eframe::App for GamepadNavigatorApp {
                 }
                 ui.separator();
                 ui.heading("Comandos do desktop");
-                shortcut_guide(ui, MOUSE_SHORTCUTS);
+                shortcut_guide(
+                    ui,
+                    if state.mode == NavigationMode::Items {
+                        ITEM_SHORTCUTS
+                    } else {
+                        MOUSE_SHORTCUTS
+                    },
+                );
                 ui.collapsing("Comandos do teclado visual", |ui| {
                     shortcut_guide(ui, KEYBOARD_SHORTCUTS);
                 });

@@ -1,5 +1,7 @@
 # Teclado QWERTY para gamepad
 
+> Esta nota técnica complementa o [guia do sistema](system-overview.md).
+
 Pesquisa de 19/10/2026. Requisito: teclado próprio, QWERTY fiel, operável pelo gamepad, com experiência equivalente em Linux e Windows.
 
 ## O defeito de velocidade

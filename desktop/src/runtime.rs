@@ -8,8 +8,9 @@ use std::{
 };
 
 use crate::{
-    control::{Action, ControlSettings, GamepadFrame, MouseController},
+    control::{Action, ControlSettings, GamepadFrame, MouseController, NavigationMode, SystemKey},
     gamepads::{GamepadInfo, Gamepads},
+    item_navigation::ItemNavigator,
     keyboard::{KeyboardSession, KeyboardSettings},
     platform::Platform,
 };
@@ -24,6 +25,8 @@ pub struct RuntimeState {
     pub selected: Option<u32>,
     pub mapping_message: Option<String>,
     pub keyboard: KeyboardSession,
+    pub mode: NavigationMode,
+    pub item_status: Option<String>,
     pending_mapping: Option<String>,
 }
 
@@ -99,6 +102,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     let input_tracker = crate::focused_input::InputTracker::default();
     let mut platform = Platform::new()?;
     let mut gamepads = Gamepads::new().map_err(|error| format!("SDL3: {error}"))?;
+    let item_navigation = ItemNavigator::default();
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
     let mut controller = MouseController::default();
     controller.keyboard.settings = state.lock().expect("runtime state lock").keyboard.settings;
@@ -143,28 +147,58 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
             };
             last_tick = now;
             for action in actions {
-                if let Action::OnScreenKeyboard(open) = action {
-                    if open
-                        && controller.keyboard.presentation
-                            == crate::keyboard::KeyboardPresentation::Unavailable
-                    {
-                        controller.keyboard.open = false;
-                        controller.keyboard.status = platform
-                            .keyboard_overlay_error()
-                            .map(str::to_owned)
-                            .or_else(|| Some("Este compositor não permite exibir o teclado próprio sem ativá-lo.".to_owned()));
-                    } else {
-                        controller.keyboard.status = Some(if open {
-                            "Teclado visual próprio · direcional move · A digita · B apaga · R3 fecha."
+                match action {
+                    Action::OnScreenKeyboard(open) => {
+                        if open
+                            && controller.keyboard.presentation
+                                == crate::keyboard::KeyboardPresentation::Unavailable
+                        {
+                            controller.keyboard.open = false;
+                            controller.keyboard.status = platform
+                                .keyboard_overlay_error()
+                                .map(str::to_owned)
+                                .or_else(|| Some("Este compositor não permite exibir o teclado próprio sem ativá-lo.".to_owned()));
                         } else {
-                            "Teclado visual fechado."
-                        }.to_owned());
+                            controller.keyboard.status = Some(if open {
+                                "Teclado visual próprio · direcional move · A digita · B apaga · R3 fecha."
+                            } else {
+                                "Teclado visual fechado."
+                            }.to_owned());
+                        }
+                        let mut runtime_state = state.lock().expect("runtime state lock");
+                        runtime_state.keyboard = controller.keyboard.clone();
                     }
-                    let mut runtime_state = state.lock().expect("runtime state lock");
-                    runtime_state.keyboard = controller.keyboard.clone();
-                } else {
-                    platform.apply(action)?;
+                    Action::ModeChanged(mode) => {
+                        item_navigation.set_enabled(mode == NavigationMode::Items)
+                    }
+                    Action::ItemDirection(direction) => item_navigation.move_focus(direction),
+                    Action::ItemActivate => item_navigation.activate(),
+                    Action::ItemCancel => {
+                        platform.apply(Action::Key(SystemKey::Escape))?;
+                        item_navigation.refresh();
+                    }
+                    Action::Key(key) => {
+                        platform.apply(Action::Key(key))?;
+                        if controller.mode == NavigationMode::Items {
+                            item_navigation.refresh();
+                        }
+                    }
+                    Action::NextWindow => {
+                        platform.apply(Action::NextWindow)?;
+                        if controller.mode == NavigationMode::Items {
+                            item_navigation.refresh();
+                        }
+                    }
+                    action => {
+                        platform.apply(action)?;
+                    }
                 }
+            }
+            {
+                let mut runtime_state = state.lock().expect("runtime state lock");
+                runtime_state.mode = controller.mode;
+                runtime_state.item_status =
+                    (controller.mode == NavigationMode::Items).then(|| item_navigation.status());
             }
             if let Err(error) = platform.update_keyboard_overlay(&controller.keyboard) {
                 controller.keyboard.open = false;
@@ -204,6 +238,7 @@ fn update_control(
 ) -> Vec<Action> {
     controller.keyboard.settings = state.keyboard.settings;
     let actions = controller.update(frame, elapsed, &mut state.settings);
+    state.mode = controller.mode;
     state.keyboard = controller.keyboard.clone();
     actions
 }

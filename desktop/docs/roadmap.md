@@ -1,5 +1,7 @@
 # Próximos passos — desktop controlado por gamepad
 
+> Para conhecer o funcionamento atual, consulte [system-overview.md](system-overview.md).
+
 ## Objetivo de conclusão
 
 Operar o desktop pelo controle em Windows e Linux: navegar por elementos acessíveis, usar o ponteiro quando a navegação semântica não estiver disponível, digitar com um teclado visual próprio sem perder o foco do aplicativo e trocar/acionar janelas e funções do sistema.
@@ -20,9 +22,9 @@ Operar o desktop pelo controle em Windows e Linux: navegar por elementos acessí
 - [x] Pausa por Start, liberação de cliques ao desconectar e retomada após centralizar/soltar o controle.
 - [ ] Concluir a validação física de controle de outros aplicativos e janelas.
 
-## Corte atual: modo mouse e teclado visual próprio
+## Corte atual: modos mouse e itens, e teclado visual próprio
 
-Esta entrega prioriza as partes de entrada, mouse e teclado das etapas 1, 2, 3, 5 e 7. A navegação por itens ainda não foi implementada. A digitação básica está ligada ao foco atual, mas precisa de validação física e de suporte a layouts Linux não US.
+Esta entrega prioriza as partes de entrada, mouse, itens e teclado das etapas 1, 2, 3, 5 e 7. A navegação por itens está implementada na base; a validação física e a matriz de compatibilidade continuam pendentes. A digitação básica está ligada ao foco atual, mas precisa de validação física e de suporte a layouts Linux não US.
 
 - [x] Painel com conexão, pausa, velocidade e zona morta.
 - [x] Loop de controle independente do foco da janela do app.
@@ -77,12 +79,13 @@ As etapas completas abaixo só terminam quando seus critérios de validação fo
 
 ### 4. Implementar o modo item por item
 
-- [ ] Windows: consultar a árvore e eventos de foco do UI Automation; navegar por nome, tipo, estado, retângulo e ações suportadas.
-- [ ] Linux: consultar árvore, foco e ações pelo AT-SPI; testar separadamente em Wayland e X11.
-- [ ] Ignorar itens ocultos/desabilitados, manter o item atual visível e oferecer confirmação, voltar, rolar e entrar/sair de grupos.
-- [ ] Cobrir menus, listas, caixas de seleção, abas, diálogos e campos de formulário.
+- [x] Windows: consultar a árvore UI Automation da janela focada, navegar por controles visíveis/focáveis e usar padrões de ação acessíveis.
+- [x] Linux: consultar a janela ativa via AT-SPI, mover o foco, rolar o item para a tela e acionar ações disponíveis.
+- [x] Ignorar itens ocultos/desabilitados, escolher o vizinho espacial mais próximo e oferecer confirmação/cancelamento.
+- [x] Alternar entre modo mouse e modo itens por L2 + R2; manter o modo mouse como padrão ao iniciar e mostrar o estado da árvore no painel.
+- [ ] Validar menus, listas, caixas de seleção, abas, diálogos e campos de formulário em aplicativos reais; completar entrada/saída de grupos quando a árvore exigir tratamento específico.
 - [ ] Criar uma matriz de compatibilidade para navegador, gerenciador de arquivos, configurações e editor de texto.
-- [ ] Quando a árvore não existir ou não for útil, oferecer troca para modo mouse e mostrar essa limitação.
+- [x] Quando a árvore não existir ou não tiver itens navegáveis, mostrar a limitação e permitir voltar ao modo mouse.
 
 **Pronto quando:** os itens acessíveis de cada aplicativo da matriz podem ser focados e acionados sem usar o ponteiro.
 
@@ -156,5 +159,5 @@ Estas combinações são propostas; ainda não estão implementadas:
 - [Windows `SendInput`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
 - [AT-SPI2](https://wiki.freedesktop.org/www/Accessibility/AT-SPI2/)
 - [Portal XDG Remote Desktop](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)
-- [Comportamento atual da extensão: navegação espacial](../lib/spatial.ts)
-- [Comportamento atual da extensão: teclado flutuante](../lib/floating-keyboard.ts)
+- [Comportamento atual da extensão: navegação espacial](../../lib/spatial.ts)
+- [Comportamento atual da extensão: teclado flutuante](../../lib/floating-keyboard.ts)
