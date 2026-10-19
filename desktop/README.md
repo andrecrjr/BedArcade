@@ -10,7 +10,7 @@ Aplicativo Rust independente da extensão do navegador, planejado para Windows e
 - Exibir um teclado visual próprio controlado pelo gamepad, sem tomar o foco do aplicativo ativo.
 - Incluir páginas do navegador quando o navegador expuser seus elementos pela API de acessibilidade do sistema.
 
-L3 abre um teclado próprio. No Windows e no Linux/X11 ele usa uma janela transparente, sempre no topo, sem foco e com os cliques do mouse repassados. Em Wayland, usa `wlr-layer-shell` com interação de teclado desativada e região de mouse vazia; o COSMIC atual oferece esse protocolo. O GNOME Wayland não oferece essa camada, então o teclado próprio informa que não está disponível nessa sessão. O app não muda o foco nem captura o campo de texto; os eventos de tecla seguem para o aplicativo que já estava ativo.
+R3 abre um teclado próprio. No Windows e no Linux/X11 ele usa uma janela transparente, sempre no topo, sem foco e com os cliques do mouse repassados. Em Wayland, usa `wlr-layer-shell` com interação de teclado desativada e região de mouse vazia; o COSMIC atual oferece esse protocolo. O GNOME Wayland não oferece essa camada, então o teclado próprio informa que não está disponível nessa sessão. O app não muda o foco nem captura o campo de texto; os eventos de tecla seguem para o aplicativo que já estava ativo.
 
 O teclado usa o bloco QWERTY ANSI com cinco fileiras alinhadas por unidades físicas: Tab à esquerda de Q, Caps à esquerda de A, dois Shift, Backspace, Enter e uma barra de espaço de 6,25 unidades. Ctrl, Alt e Super combinam com a próxima tecla e depois são liberados; Caps mantém maiúsculas e Shift vale para o próximo caractere. Esc continua disponível no botão superior do gamepad. No Windows, caracteres são enviados como Unicode. No Linux, o dispositivo `uinput` envia códigos de tecla do mapa US/QWERTY; layouts diferentes podem produzir símbolos diferentes e caracteres acentuados ainda precisam de suporte de layout.
 
@@ -22,7 +22,7 @@ A janela do teclado fica oculta quando fechado; seu fundo de renderização é t
 
 ![Prévia renderizada do teclado QWERTY](keyboard-preview.png)
 
-Com o teclado aberto, **Start** abre os ajustes: cima/baixo escolhe uma opção e esquerda/direita altera. Start volta à digitação e salva; L3 fecha e salva. Também existe a seção **Personalizar teclado QWERTY** no painel. É possível ajustar largura (520–1000 px, com altura proporcional), posição em cima/embaixo, opacidade, espera inicial, intervalo e desativar a repetição para avançar somente por toque. Os ajustes ficam em `~/.config/gamepad-navigator/keyboard.json` (ou `$XDG_CONFIG_HOME`) no Linux e `%APPDATA%/gamepad-navigator/keyboard.json` no Windows.
+Com o teclado aberto, **Start** abre os ajustes: cima/baixo escolhe uma opção e esquerda/direita altera. Start volta à digitação e salva; R3 fecha e salva. Também existe a seção **Personalizar teclado QWERTY** no painel. É possível ajustar largura (520–1000 px, com altura proporcional), posição em cima/embaixo, opacidade, espera inicial, intervalo e desativar a repetição para avançar somente por toque. Os ajustes ficam em `~/.config/gamepad-navigator/keyboard.json` (ou `$XDG_CONFIG_HOME`) no Linux e `%APPDATA%/gamepad-navigator/keyboard.json` no Windows.
 
 A pesquisa e as limitações de foco e layout estão em [KEYBOARD_RESEARCH.md](KEYBOARD_RESEARCH.md). Uma prévia do desenho real pode ser gerada no Linux com `cargo run --manifest-path desktop/Cargo.toml --example keyboard_preview`; os arquivos PPM ficam em `/tmp/gamepad-keyboard-preview`.
 
@@ -34,7 +34,7 @@ O modo mouse também depende do sistema e do ambiente gráfico. Esta primeira en
 
 O primeiro fluxo de desktop é o modo mouse: o app lê um controle do sistema e envia movimento, cliques, rolagem e teclas para a janela ativa. A leitura funciona em uma thread própria, inclusive quando o painel está em segundo plano ou recolhido na bandeja.
 
-L3 abre ou fecha o teclado visual. Enquanto ele está aberto, o direcional move a seleção e A digita a tecla destacada; B apaga, X envia Enter, Y envia Esc, R3 envia espaço, L1 envia Tab e R1 alterna Shift. O controle deixa de mover o mouse nesse modo. A janela do teclado não recebe foco nem entrada do mouse, para que o cursor de texto e o ponteiro continuem pertencendo ao aplicativo ativo.
+R3 abre ou fecha o teclado visual. Enquanto ele está aberto, o direcional move a seleção e A digita a tecla destacada; B apaga, X envia Enter, Y envia Esc, L3 envia espaço, L1 envia Tab e R1 alterna Shift. O controle deixa de mover o mouse nesse modo. A janela do teclado não recebe foco nem entrada do mouse, para que o cursor de texto e o ponteiro continuem pertencendo ao aplicativo ativo.
 
 ### Mapeamento inicial
 
@@ -47,13 +47,13 @@ L3 abre ou fecha o teclado visual. Enquanto ele está aberto, o direcional move 
 | Botão esquerdo (X/□; Y no Switch) | Enter / abrir o item selecionado                  |
 | Botão superior (Y/△; X no Switch) | Escape / voltar                                   |
 | Direcional                        | Setas, com repetição ao segurar                   |
-| L3                                | Abrir / fechar o teclado visual próprio           |
-| R3                                | Super / Windows, para abrir o lançador do sistema |
+| R3                                | Abrir / fechar o teclado visual próprio           |
+| L3                                | Super / Windows, para abrir o lançador do sistema |
 | LB / L1                           | Tab                                               |
 | RB / R1                           | Alt+Tab                                           |
 | Start / Menu                      | Pausar ou retomar o controle do desktop           |
 
-Para abrir um programa: pressione R3, escolha um item com o direcional e confirme com o botão esquerdo; também é possível apontar e clicar com o botão inferior. O lançador e seu atalho precisam estar configurados no ambiente. No COSMIC desta máquina, Super está configurado para abrir o lançador.
+Para abrir um programa: pressione L3, escolha um item com o direcional e confirme com o botão esquerdo; também é possível apontar e clicar com o botão inferior. O lançador e seu atalho precisam estar configurados no ambiente. No COSMIC desta máquina, Super está configurado para abrir o lançador.
 
 O painel mostra os comandos do modo mouse e do teclado visual, com nomes por posição física e equivalentes de Xbox, PlayStation e Switch. As configurações e perfis ficam em seções expansíveis. Escape cancela menus/diálogos; não equivale a voltar no histórico do navegador.
 
@@ -101,11 +101,11 @@ A compilação padrão inclui SDL3 a partir do código-fonte e exige CMake e um 
 
 Execute `cargo test --manifest-path desktop/Cargo.toml`, `cargo fmt --manifest-path desktop/Cargo.toml --check` e `cargo clippy --manifest-path desktop/Cargo.toml --all-targets -- -D warnings`.
 
-Os testes nativos são optativos: `cargo test --manifest-path desktop/Cargo.toml --lib -- --ignored --test-threads=1`. Eles verificam a identificação de mouse/teclado pelo udev, leitura e desconexão por SDL, importação de perfil para controle virtual desconhecido e leitura de um controle físico. Exigem `/dev/uinput`, `udevadm` e um controle físico conectado para o teste correspondente. Os testes também cobrem L3 sem repetição por pressão longa, movimento do ponteiro no modo de teclado por mouse, repasse do controle no modo COSMIC, liberação do arrasto e pausa/desconexão. A validação manual das ações no desktop continua necessária.
+Os testes nativos são optativos: `cargo test --manifest-path desktop/Cargo.toml --lib -- --ignored --test-threads=1`. Eles verificam a identificação de mouse/teclado pelo udev, leitura e desconexão por SDL, importação de perfil para controle virtual desconhecido e leitura de um controle físico. Exigem `/dev/uinput`, `udevadm` e um controle físico conectado para o teste correspondente. Os testes também cobrem R3 sem repetição por pressão longa, movimento do ponteiro no modo de teclado por mouse, repasse do controle no modo COSMIC, liberação do arrasto e pausa/desconexão. A validação manual das ações no desktop continua necessária.
 
 A bandeja já foi validada no COSMIC/Wayland em uma versão anterior: registro do ícone/menu, recolhimento e reabertura mantendo o mesmo processo e dispositivos virtuais, e encerramento removendo os dispositivos. Os builds release Linux e Windows x64 terminaram com sucesso, e o ZIP Windows foi atualizado. Linux/X11, foco/caret, teclado com controle físico e execução com controle físico no Windows 11 ainda precisam de validação manual.
 
-Na sessão gráfica, conecte um controle, abra o app, mova o ponteiro, arraste uma janela segurando o botão inferior, role uma página, abra o lançador com R3 e inicie um programa com o direcional e o botão esquerdo. Foque um campo de texto e pressione L3. Confirme que o teclado próprio não toma o foco, que o ponteiro continua visível e que A escreve no cursor original. Teste Shift, símbolos, Backspace, Enter, Esc e um campo de senha. No Linux, valide também um layout não US e anote o suporte a acentos; em Wayland, confirme que o compositor oferece `wlr-layer-shell`. Feche o painel e confira a reabertura pela bandeja. Pause durante um arrasto e desconecte/reconecte para conferir a recuperação.
+Na sessão gráfica, conecte um controle, abra o app, mova o ponteiro, arraste uma janela segurando o botão inferior, role uma página, abra o lançador com L3 e inicie um programa com o direcional e o botão esquerdo. Foque um campo de texto e pressione R3. Confirme que o teclado próprio não toma o foco, que o ponteiro continua visível e que A escreve no cursor original. Teste Shift, símbolos, Backspace, Enter, Esc e um campo de senha. No Linux, valide também um layout não US e anote o suporte a acentos; em Wayland, confirme que o compositor oferece `wlr-layer-shell`. Feche o painel e confira a reabertura pela bandeja. Pause durante um arrasto e desconecte/reconecte para conferir a recuperação.
 
 ## Referências
 

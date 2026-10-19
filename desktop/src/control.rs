@@ -7,11 +7,11 @@ const DIRECTION_REPEAT_INTERVAL: f64 = 0.08;
 
 pub const MOUSE_SHORTCUTS: &[(&str, &str)] = &[
     (
-        "L3 · pressionar analógico esquerdo",
+        "R3 · pressionar analógico direito",
         "Abrir / fechar teclado visual próprio",
     ),
     (
-        "R3 · pressionar analógico direito",
+        "L3 · pressionar analógico esquerdo",
         "Lançador do sistema · Super / Windows",
     ),
     ("Analógico esquerdo", "Mover ponteiro"),
@@ -44,10 +44,10 @@ pub const KEYBOARD_SHORTCUTS: &[(&str, &str)] = &[
     ("B / botão direito", "Apagar um caractere"),
     ("X / botão esquerdo", "Inserir Enter"),
     ("Y / botão superior", "Inserir Esc"),
-    ("R3", "Inserir espaço"),
+    ("L3", "Inserir espaço"),
     ("L1", "Inserir Tab"),
     ("R1", "Ativar ou desativar Shift"),
-    ("L3", "Fechar o teclado visual"),
+    ("R3", "Fechar o teclado visual"),
     (
         "Start / Menu / +",
         "Ajustes do teclado · direcional escolhe e altera",
@@ -201,7 +201,7 @@ impl MouseController {
         }
 
         let keyboard_toggled =
-            frame.pressed(Button::LeftStick) && !self.previous.pressed(Button::LeftStick);
+            frame.pressed(Button::RightStick) && !self.previous.pressed(Button::RightStick);
         if keyboard_toggled {
             actions.push(self.toggle_keyboard());
             self.release(&mut actions);
@@ -230,7 +230,7 @@ impl MouseController {
         for (button, action) in [
             (Button::West, Action::Key(SystemKey::Enter)),
             (Button::North, Action::Key(SystemKey::Escape)),
-            (Button::RightStick, Action::Key(SystemKey::Meta)),
+            (Button::LeftStick, Action::Key(SystemKey::Meta)),
             (Button::LeftShoulder, Action::Key(SystemKey::Tab)),
             (Button::RightShoulder, Action::NextWindow),
         ] {
@@ -396,7 +396,7 @@ impl MouseController {
             (Button::East, KeyboardInput::Backspace),
             (Button::West, KeyboardInput::Enter),
             (Button::North, KeyboardInput::Escape),
-            (Button::RightStick, KeyboardInput::Space),
+            (Button::LeftStick, KeyboardInput::Space),
             (Button::LeftShoulder, KeyboardInput::Tab),
         ] {
             if frame.pressed(button) && !self.previous.pressed(button) {

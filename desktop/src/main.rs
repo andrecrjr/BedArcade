@@ -69,7 +69,7 @@ impl eframe::App for GamepadNavigatorApp {
                 } else if let Some(name) = &state.controller {
                     ui.colored_label(Color32::LIGHT_GREEN, format!("Controle: {name}"));
                     ui.label(if state.keyboard.open {
-                        "Teclado visual próprio · direcional move · A digita · L3 fecha"
+                        "Teclado visual próprio · direcional move · A digita · R3 fecha"
                     } else if state.settings.enabled {
                         "Modo mouse · solte os botões e centralize os analógicos ao conectar/retomar"
                     } else {

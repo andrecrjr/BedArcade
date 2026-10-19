@@ -10,7 +10,7 @@ Operar o desktop pelo controle em Windows e Linux: navegar por elementos acessí
 
 - [x] Pasta Rust independente da extensão.
 - [x] Teclado visual próprio com layout QWERTY e seleção destacada por gamepad.
-- [x] L3 abre e fecha o teclado visual sem mudar o foco do aplicativo ativo.
+- [x] R3 abre e fecha o teclado visual sem mudar o foco do aplicativo ativo.
 - [x] Windows e Linux/X11 usam viewport transparente, sem ativação, no topo e com mouse pass-through.
 - [x] Wayland usa camada `wlr-layer-shell` sem foco de teclado e com região de mouse vazia.
 - [x] O painel mostra os comandos do mouse e do teclado visual.
@@ -52,7 +52,7 @@ As etapas completas abaixo só terminam quando seus critérios de validação fo
 - [ ] Definir as versões mínimas de Windows e os ambientes Linux a validar: Wayland e X11, incluindo os compositores disponíveis para teste.
 - [x] Comparar bibliotecas e APIs nativas: SDL3 escolhida com o usuário para ampliar famílias e perfis, substituindo evdev direto/XInput exclusivo.
 - [x] Registrar a decisão e os limites atuais no README; validar fisicamente os modelos da matriz continua pendente.
-- [ ] Definir mapeamento inicial, botão para abrir o menu do app, troca de modo e recuperação quando o controle desconectar. Deixar os botões configuráveis; avaliar R3 para abrir o menu Iniciar sem fixá-lo como padrão antes do teste.
+- [ ] Definir mapeamento inicial, botão para abrir o menu do app, troca de modo e recuperação quando o controle desconectar. Deixar os botões configuráveis; avaliar L3 para abrir o menu Iniciar sem fixá-lo como padrão antes do teste.
 
 **Pronto quando:** o app detecta, identifica e volta a detectar um controle removido/reconectado nos sistemas-alvo.
 
@@ -103,7 +103,7 @@ As etapas completas abaixo só terminam quando seus critérios de validação fo
 - [x] Windows: abrir uma janela transparente sem ativação, no topo e com mouse pass-through; enviar caracteres Unicode com Enigo.
 - [x] Linux/X11: abrir o teclado visual sem ativação e enviar teclas via `uinput`.
 - [x] Linux/Wayland: usar `wlr-layer-shell`, `KeyboardInteractivity::None` e região de mouse vazia.
-- [x] L3 abre/fecha; direcional navega; A digita; B apaga; X envia Enter; Y envia Esc; R3 envia espaço; L1 envia Tab; R1 alterna Shift.
+- [x] R3 abre/fecha; direcional navega; A digita; B apaga; X envia Enter; Y envia Esc; L3 envia espaço; L1 envia Tab; R1 alterna Shift.
 - [ ] Detectar foco em campo de texto e abrir o teclado automaticamente por APIs de acessibilidade, sem tirar o foco do campo.
 - [ ] Validar foco, caret, cursor do mouse e campos de senha na matriz de aplicativos e sistemas.
 - [ ] Linux: obter o mapa de teclado da sessão para renderizar e enviar caracteres de acordo com o layout ativo, incluindo acentos.

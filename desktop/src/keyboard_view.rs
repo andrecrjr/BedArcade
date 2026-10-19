@@ -175,9 +175,9 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 }
             }
             let help = if session.customizing {
-                "Start voltar e salvar · L3 fechar"
+                "Start voltar e salvar · R3 fechar"
             } else {
-                "A digitar · B apagar · R3 espaço · R1 Shift · Start ajustes"
+                "A digitar · B apagar · L3 espaço · R1 Shift · Start ajustes"
             };
             painter.text(
                 point(360.0, 233.0),
@@ -190,7 +190,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 painter.text(
                     point(360.0, 249.0),
                     Align2::CENTER_CENTER,
-                    "X Enter · Y Esc · L1 Tab · L3 fechar",
+                    "X Enter · Y Esc · L1 Tab · R3 fechar",
                     FontId::proportional(10.0 * scale),
                     Color32::from_gray(165),
                 );

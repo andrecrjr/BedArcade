@@ -155,7 +155,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                             .or_else(|| Some("Este compositor não permite exibir o teclado próprio sem ativá-lo.".to_owned()));
                     } else {
                         controller.keyboard.status = Some(if open {
-                            "Teclado visual próprio · direcional move · A digita · B apaga · L3 fecha."
+                            "Teclado visual próprio · direcional move · A digita · B apaga · R3 fecha."
                         } else {
                             "Teclado visual fechado."
                         }.to_owned());
@@ -214,13 +214,13 @@ mod tests {
     use crate::control::GamepadFrame;
 
     #[test]
-    fn l3_requests_the_system_keyboard_without_opening_the_app_panel() {
+    fn r3_requests_the_system_keyboard_without_opening_the_app_panel() {
         let mut state = RuntimeState::default();
         let mut controller = MouseController::default();
         let neutral = GamepadFrame::default();
         update_control(&mut state, &mut controller, Some(&neutral), Duration::ZERO);
         let mut frame = neutral;
-        frame.buttons[crate::control::Button::LeftStick as usize] = true;
+        frame.buttons[crate::control::Button::RightStick as usize] = true;
 
         let actions = update_control(&mut state, &mut controller, Some(&frame), Duration::ZERO);
 
