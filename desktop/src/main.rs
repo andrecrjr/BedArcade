@@ -38,6 +38,10 @@ impl GamepadNavigatorApp {
 }
 
 impl eframe::App for GamepadNavigatorApp {
+    fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
+        [0.0; 4]
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         handle_panel_close(ui.ctx(), &self.panel, self.tray_error.is_none());
         ui.ctx().request_repaint_after(Duration::from_millis(50));
@@ -140,6 +144,7 @@ impl eframe::App for GamepadNavigatorApp {
                     if changed {
                         self.desktop.lock().expect("desktop runtime lock").configure_keyboard(settings);
                     }
+                    ui.small("O teclado acompanha o campo quando o aplicativo fornece sua posição. Em cima/Embaixo define a alternativa quando essa informação não está disponível.");
                     ui.small("Com o teclado aberto, Start também abre estes ajustes pelo gamepad. As preferências são salvas ao voltar.");
                     ui.small("QWERTY ANSI · Shift vale para a próxima letra · Caps fixa maiúsculas · Ctrl, Alt e Super combinam com a próxima tecla.");
                 });
@@ -192,32 +197,81 @@ fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession) {
         .input(|input| input.viewport().monitor_size)
         .unwrap_or(egui::vec2(1920.0, 1080.0));
     let (width, height) = session.settings.surface_size();
-    let size = egui::vec2(width as f32, height as f32);
-    let position = egui::pos2(
-        (screen.x - size.x).max(0.0) / 2.0,
-        if session.settings.position == KeyboardPosition::Top {
-            20.0
-        } else {
-            (screen.y - size.y - 20.0).max(0.0)
-        },
-    );
     let viewport = egui::ViewportId::from_hash_of("gamepad-navigator-keyboard");
+    let pixels_per_point = ui
+        .ctx()
+        .input(|i| {
+            i.raw
+                .viewports
+                .get(&viewport)
+                .and_then(|v| v.native_pixels_per_point)
+        })
+        .unwrap_or_else(|| ui.ctx().native_pixels_per_point().unwrap_or(1.0));
+    // UIA uses physical pixels; egui viewport positions use logical points.
+    let factor = if cfg!(target_os = "windows") {
+        pixels_per_point
+    } else {
+        1.0
+    };
+    let screen =
+        session
+            .focused_input
+            .and_then(|f| f.screen)
+            .unwrap_or(gamepad_desktop::placement::Rect {
+                x: 0,
+                y: 0,
+                width: (screen.x * factor) as i32,
+                height: (screen.y * factor) as i32,
+            });
+    let rect = gamepad_desktop::placement::keyboard_rect(
+        screen,
+        session.focused_input.map(|f| f.bounds),
+        (
+            (width as f32 * factor) as u32,
+            (height as f32 * factor) as u32,
+        ),
+        session.settings.position == KeyboardPosition::Top,
+    );
+    let size = egui::vec2(rect.width as f32 / factor, rect.height as f32 / factor);
+    let position = egui::pos2(rect.x as f32 / factor, rect.y as f32 / factor);
     ui.ctx().show_viewport_deferred(
         viewport,
-        egui::ViewportBuilder::default()
-            .with_title("Gamepad Navigator · Teclado")
-            .with_inner_size(size)
-            .with_position(position)
-            .with_resizable(false)
-            .with_decorations(false)
-            .with_transparent(true)
-            .with_active(false)
-            .with_always_on_top()
-            .with_mouse_passthrough(true)
-            .with_taskbar(false)
-            .with_visible(true),
+        keyboard_viewport_builder(size, position, session.open),
         move |ui, _| keyboard_viewport_ui(ui, &session),
     );
+}
+
+fn keyboard_viewport_builder(
+    size: egui::Vec2,
+    position: egui::Pos2,
+    open: bool,
+) -> egui::ViewportBuilder {
+    egui::ViewportBuilder::default()
+        .with_title("Gamepad Navigator · Teclado")
+        .with_inner_size(size)
+        .with_position(position)
+        .with_resizable(false)
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_active(false)
+        .with_always_on_top()
+        .with_mouse_passthrough(true)
+        .with_taskbar(false)
+        .with_has_shadow(false)
+        .with_visible(open)
+}
+
+#[cfg(test)]
+mod overlay_tests {
+    use super::*;
+    #[test]
+    fn closed_keyboard_has_no_visible_window_or_native_shadow() {
+        let builder = keyboard_viewport_builder(egui::vec2(640.0, 229.0), egui::Pos2::ZERO, false);
+        assert_eq!(builder.visible, Some(false));
+        assert_eq!(builder.has_shadow, Some(false));
+        assert_eq!(builder.transparent, Some(true));
+        assert_eq!(builder.active, Some(false));
+    }
 }
 
 fn keyboard_viewport_ui(ui: &mut egui::Ui, session: &KeyboardSession) {

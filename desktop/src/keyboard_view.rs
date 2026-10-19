@@ -11,13 +11,15 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
             if !session.open {
                 return;
             }
-            let (width, height) = session.settings.surface_size();
-            let scale = width as f32 / 720.0;
+            let (width, _) = session.settings.surface_size();
+            let scale = (width as f32 / 720.0)
+                .min(ui.available_width() / 720.0)
+                .min(ui.available_height() / 258.0);
             let origin = ui.min_rect().min;
             let point = |x, y| origin + Vec2::new(x * scale, y * scale);
             let painter = ui.painter();
             let accent = Color32::from_rgb(94, 234, 212);
-            let outer = Rect::from_min_size(origin, Vec2::new(width as f32, height as f32));
+            let outer = Rect::from_min_size(origin, Vec2::new(720.0, 258.0) * scale);
             painter.rect_filled(
                 outer,
                 10.0,
@@ -194,4 +196,36 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 );
             }
         });
+}
+
+#[cfg(test)]
+mod sizing_tests {
+    use super::*;
+
+    #[test]
+    fn all_keys_fit_when_the_monitor_requires_a_smaller_surface() {
+        let context = egui::Context::default();
+        let mut session = KeyboardSession::default();
+        session.open = true;
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    Vec2::new(460.0, 164.0),
+                )),
+                ..Default::default()
+            },
+            |ui| show(ui, &session),
+        );
+        output.textures_delta.clear();
+        for shape in output.shapes {
+            let bounds = shape.shape.visual_bounding_rect();
+            if bounds.is_positive() {
+                assert!(
+                    bounds.max.x <= 461.0 && bounds.max.y <= 165.0,
+                    "clipped keyboard: {bounds:?}"
+                );
+            }
+        }
+    }
 }

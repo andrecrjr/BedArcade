@@ -341,6 +341,7 @@ checksum = "c77886257be21c9cd89a4ae7e64860c6f0eefca799bb79127913052bd0eefb3d"
 dependencies = [
  "atspi-common",
  "atspi-proxies",
+ "zbus",
 ]
 
 [[package]]
@@ -1304,12 +1305,15 @@ dependencies = [
 name = "gamepad-desktop"
 version = "0.1.0"
 dependencies = [
+ "async-io",
+ "atspi",
  "bytemuck",
  "eframe",
  "egui 0.34.3",
  "egui_software_backend",
  "enigo",
  "evdev",
+ "futures-lite",
  "rustix 1.1.5",
  "sdl3",
  "sdl3-sys",
@@ -1318,6 +1322,8 @@ dependencies = [
  "smithay-client-toolkit",
  "tray-icon",
  "wayland-client",
+ "windows 0.62.2",
+ "zbus",
 ]
 
 [[package]]

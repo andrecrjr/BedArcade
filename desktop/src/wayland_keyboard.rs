@@ -35,6 +35,10 @@ pub struct WaylandKeyboardOverlay {
     connection: Connection,
     queue: EventQueue<OverlayState>,
     state: OverlayState,
+    compositor: CompositorState,
+    layer_shell: LayerShell,
+    output: Option<wl_output::WlOutput>,
+    placement: Option<crate::placement::Rect>,
 }
 
 impl WaylandKeyboardOverlay {
@@ -95,6 +99,10 @@ impl WaylandKeyboardOverlay {
             connection,
             queue,
             state,
+            compositor,
+            layer_shell,
+            output: None,
+            placement: None,
         };
         overlay
             .queue
@@ -106,20 +114,7 @@ impl WaylandKeyboardOverlay {
     }
 
     pub fn update(&mut self, session: &KeyboardSession) -> Result<(), String> {
-        if self.state.session.settings != session.settings {
-            let (width, height) = session.settings.surface_size();
-            self.state
-                .layer
-                .set_anchor(if session.settings.position == KeyboardPosition::Top {
-                    Anchor::TOP
-                } else {
-                    Anchor::BOTTOM
-                });
-            self.state.layer.set_margin(20, 0, 20, 0);
-            self.state.layer.set_size(width, height);
-            self.state.width = width;
-            self.state.height = height;
-        }
+        self.position(session)?;
         if self.state.session != *session {
             self.state.session = session.clone();
             self.state.dirty = true;
@@ -158,6 +153,99 @@ impl WaylandKeyboardOverlay {
         {}
         if self.state.dirty && self.state.configured {
             self.state.draw()?;
+        }
+        Ok(())
+    }
+
+    fn position(&mut self, session: &KeyboardSession) -> Result<(), String> {
+        let outputs: Vec<_> = self
+            .state
+            .output_state
+            .outputs()
+            .filter_map(|output| {
+                let info = self.state.output_state.info(&output)?;
+                let (x, y) = info.logical_position?;
+                let (width, height) = info.logical_size?;
+                let rect = crate::placement::Rect {
+                    x,
+                    y,
+                    width,
+                    height,
+                };
+                rect.valid().then_some((output, rect))
+            })
+            .collect();
+        let input = session.focused_input.map(|f| f.bounds);
+        let selected = input
+            .and_then(|input| {
+                outputs
+                    .iter()
+                    .find(|(_, screen)| screen.contains_center(input))
+            })
+            .or_else(|| {
+                outputs
+                    .iter()
+                    .find(|(output, _)| Some(output) == self.output.as_ref())
+            })
+            .or_else(|| outputs.first());
+        let Some((output, screen)) = selected else {
+            // xdg-output geometry is optional. Keep configurable docking when
+            // a compositor does not publish logical monitor coordinates.
+            if self.state.session.settings != session.settings {
+                let (width, height) = session.settings.surface_size();
+                self.state.layer.set_anchor(
+                    if session.settings.position == KeyboardPosition::Top {
+                        Anchor::TOP
+                    } else {
+                        Anchor::BOTTOM
+                    },
+                );
+                self.state.layer.set_margin(20, 0, 20, 0);
+                self.state.layer.set_size(width, height);
+                self.state.width = width;
+                self.state.height = height;
+                self.state.layer.commit();
+            }
+            return Ok(());
+        };
+        let rect = crate::placement::keyboard_rect(
+            *screen,
+            input,
+            session.settings.surface_size(),
+            session.settings.position == KeyboardPosition::Top,
+        );
+        if self.output.as_ref() != Some(output) {
+            let layer = self.layer_shell.create_layer_surface(
+                &self.queue.handle(),
+                self.compositor.create_surface(&self.queue.handle()),
+                Layer::Overlay,
+                Some("gamepad-navigator-keyboard"),
+                Some(output),
+            );
+            layer.set_keyboard_interactivity(KeyboardInteractivity::None);
+            let region = Region::new(&self.compositor).map_err(|e| e.to_string())?;
+            layer
+                .wl_surface()
+                .set_input_region(Some(region.wl_region()));
+            self.state.layer = layer;
+            self.output = Some(output.clone());
+            self.state.configured = false;
+            self.placement = None;
+        }
+        if self.placement != Some(rect) {
+            self.state.layer.set_anchor(Anchor::TOP | Anchor::LEFT);
+            self.state.layer.set_exclusive_zone(-1);
+            self.state
+                .layer
+                .set_margin(rect.y - screen.y, 0, 0, rect.x - screen.x);
+            self.state
+                .layer
+                .set_size(rect.width as u32, rect.height as u32);
+            self.state.width = rect.width as u32;
+            self.state.height = rect.height as u32;
+            self.state.dirty = true;
+            self.state.layer.commit();
+            self.placement = Some(rect);
         }
         Ok(())
     }

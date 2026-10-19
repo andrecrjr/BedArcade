@@ -15,3 +15,5 @@ Analógico esquerdo move o ponteiro; analógico direito rola; A segura o clique 
 
 As teclas são enviadas ao aplicativo que já estava ativo; deixe o cursor no campo antes de abrir o teclado. No Windows, aplicativos executados como administrador podem recusar entrada de aplicativos comuns.
 Fechar a janela recolhe o painel para a bandeja. Use o ícone do gamepad perto do relógio para reabri-lo ou sair.
+
+O teclado tenta acompanhar o campo acima, abaixo ou ao lado, sem sobreposição quando houver espaço, usando a posição fornecida pelo aplicativo via acessibilidade. Sem essa informação, usa a posição configurada. A janela fica oculta quando o teclado fecha e não mantém um fundo escuro na tela.

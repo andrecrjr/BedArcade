@@ -16,6 +16,10 @@ O teclado usa o bloco QWERTY ANSI com cinco fileiras alinhadas por unidades fís
 
 O direcional move uma tecla por toque. Por padrão, segurar repete após 600 ms e depois a cada 400 ms. A navegação vertical considera a posição e a largura real das teclas e preserva a coluna ao atravessar a barra de espaço. As bordas laterais seguram a seleção. O tamanho padrão é 640 × 229 px, e as duas plataformas compartilham o mesmo desenho.
 
+O posicionamento acompanha o campo focado quando o aplicativo publica suas coordenadas de acessibilidade: o teclado fica acima, com 12 px de separação, alinhado ao campo e limitado às bordas do monitor. Sem espaço acima, tenta abaixo e depois ao lado. Um editor que ocupa toda a tela pode não deixar área livre. A consulta roda separada da leitura do gamepad e não lê o texto. No Windows, usa UI Automation e a área útil do monitor; no Linux, AT-SPI. Aplicativos sem acessibilidade ou com coordenadas inválidas usam a posição em cima/embaixo configurada. Em Wayland, coordenadas iguais às relativas à janela são consideradas ambíguas e usam essa alternativa; nem todo aplicativo fornece posição global confiável. O acompanhamento automático não é universal.
+
+A janela do teclado fica oculta quando fechado; seu fundo de renderização é transparente e a sombra nativa está desativada, evitando o retângulo escuro que permanecia no Windows.
+
 ![Prévia renderizada do teclado QWERTY](keyboard-preview.png)
 
 Com o teclado aberto, **Start** abre os ajustes: cima/baixo escolhe uma opção e esquerda/direita altera. Start volta à digitação e salva; L3 fecha e salva. Também existe a seção **Personalizar teclado QWERTY** no painel. É possível ajustar largura (520–1000 px, com altura proporcional), posição em cima/embaixo, opacidade, espera inicial, intervalo e desativar a repetição para avançar somente por toque. Os ajustes ficam em `~/.config/gamepad-navigator/keyboard.json` (ou `$XDG_CONFIG_HOME`) no Linux e `%APPDATA%/gamepad-navigator/keyboard.json` no Windows.

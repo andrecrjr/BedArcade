@@ -239,6 +239,7 @@ pub struct KeyboardModifiers {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyboardSession {
+    pub focused_input: Option<crate::focused_input::FocusedInput>,
     pub open: bool,
     pub status: Option<String>,
     pub presentation: KeyboardPresentation,
@@ -256,6 +257,7 @@ pub struct KeyboardSession {
 impl Default for KeyboardSession {
     fn default() -> Self {
         Self {
+            focused_input: None,
             open: false,
             status: None,
             presentation: KeyboardPresentation::default(),

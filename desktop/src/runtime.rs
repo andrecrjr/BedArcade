@@ -96,6 +96,7 @@ impl Drop for DesktopRuntime {
 }
 
 fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
+    let input_tracker = crate::focused_input::InputTracker::default();
     let mut platform = Platform::new()?;
     let mut gamepads = Gamepads::new().map_err(|error| format!("SDL3: {error}"))?;
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
@@ -128,6 +129,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                 gamepads.poll(selected)?
             };
             let actions = {
+                controller.keyboard.focused_input = input_tracker.latest();
                 let mut state = state.lock().expect("runtime state lock");
                 state.controller = gamepads.name();
                 state.devices = gamepads.devices.clone();
