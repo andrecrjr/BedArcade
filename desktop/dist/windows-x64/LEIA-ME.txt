@@ -1,0 +1,15 @@
+Gamepad Navigator — Windows 11 x64
+
+1. Extraia este ZIP para uma pasta.
+2. Abra GamepadNavigator.exe.
+3. Conecte o controle por USB ou Bluetooth.
+4. Para digitar, foque um campo de texto no aplicativo, pressione L3 e navegue pelo teclado visual com o direcional. A mostra a tecla selecionada.
+
+Teclado visual:
+L3 abre/fecha; direcional move a seleção; A digita; B apaga; X envia Enter; Y envia Esc; R3 insere espaço; L1 insere Tab; R1 ativa Shift; L3 fecha. Ao segurar o direcional, a seleção repete após uma pausa e segue em ritmo mais lento.
+
+Modo mouse:
+Analógico esquerdo move o ponteiro; analógico direito rola; A segura o clique esquerdo para arrastar; B clica com o botão direito; X envia Enter; Y envia Esc; R3 abre o lançador do sistema; L1 envia Tab; R1 alterna janelas; Start pausa ou retoma.
+
+A inserção de texto depende do aplicativo expor o campo de texto. No Windows, aplicativos executados como administrador podem recusar entrada de aplicativos comuns.
+Fechar a janela recolhe o painel para a bandeja. Use o ícone do gamepad perto do relógio para reabri-lo ou sair.
