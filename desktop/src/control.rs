@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use crate::keyboard::{KeyboardKey, KeyboardSession};
+use crate::keyboard::{KeyboardKey, KeyboardModifiers, KeyboardSession};
 
 const REPEAT_INITIAL_DELAY: f64 = 0.4;
 const DIRECTION_REPEAT_INTERVAL: f64 = 0.08;
-const KEYBOARD_REPEAT_INTERVAL: f64 = 0.18;
 
 pub const MOUSE_SHORTCUTS: &[(&str, &str)] = &[
     (
@@ -49,6 +48,10 @@ pub const KEYBOARD_SHORTCUTS: &[(&str, &str)] = &[
     ("L1", "Inserir Tab"),
     ("R1", "Ativar ou desativar Shift"),
     ("L3", "Fechar o teclado visual"),
+    (
+        "Start / Menu / +",
+        "Ajustes do teclado · direcional escolhe e altera",
+    ),
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -125,6 +128,7 @@ pub enum KeyboardInput {
     Escape,
     Space,
     Tab,
+    Menu,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,6 +138,7 @@ pub enum Action {
     Mouse(MouseButton, bool),
     Key(SystemKey),
     Keyboard(KeyboardInput),
+    KeyboardChord(KeyboardInput, KeyboardModifiers),
     NextWindow,
     OnScreenKeyboard(bool),
 }
@@ -203,7 +208,7 @@ impl MouseController {
             self.previous = *frame;
         }
         if self.keyboard.open && self.system_keyboard_uses_gamepad && !keyboard_toggled {
-            self.release(&mut actions);
+            self.release_mouse(&mut actions);
             self.update_keyboard(frame, elapsed, &mut actions);
             self.previous = *frame;
             return actions;
@@ -244,7 +249,14 @@ impl MouseController {
         .enumerate()
         {
             if !keyboard_toggled
-                && self.repeat_direction(frame, button, index, elapsed, DIRECTION_REPEAT_INTERVAL)
+                && self.repeat_direction(
+                    frame,
+                    button,
+                    index,
+                    elapsed,
+                    REPEAT_INITIAL_DELAY,
+                    DIRECTION_REPEAT_INTERVAL,
+                )
             {
                 actions.push(Action::Key(key));
             }
@@ -278,13 +290,15 @@ impl MouseController {
     fn toggle_keyboard(&mut self) -> Action {
         self.keyboard.open = !self.keyboard.open;
         self.keyboard.status = None;
+        self.keyboard.customizing = false;
+        self.keyboard.modifiers = KeyboardModifiers::default();
+        self.keyboard.shift = false;
         Action::OnScreenKeyboard(self.keyboard.open)
     }
 
     fn close_keyboard(&mut self, actions: &mut Vec<Action>) {
         if self.keyboard.open {
-            self.keyboard.open = false;
-            actions.push(Action::OnScreenKeyboard(false));
+            actions.push(self.toggle_keyboard());
         }
     }
 
@@ -306,13 +320,14 @@ impl MouseController {
         button: Button,
         index: usize,
         elapsed: Duration,
+        initial_delay: f64,
         repeat_interval: f64,
     ) -> bool {
         if !frame.pressed(button) {
             return false;
         }
         if !self.previous.pressed(button) {
-            self.repeat[index] = REPEAT_INITIAL_DELAY;
+            self.repeat[index] = initial_delay;
             return true;
         }
         self.repeat[index] -= elapsed.as_secs_f64().min(0.05);
@@ -329,6 +344,28 @@ impl MouseController {
         elapsed: Duration,
         actions: &mut Vec<Action>,
     ) {
+        if frame.pressed(Button::Start) && !self.previous.pressed(Button::Start) {
+            self.keyboard.customizing = !self.keyboard.customizing;
+            self.repeat = [f64::from(self.keyboard.settings.repeat_delay_ms) / 1000.0; 4];
+            return;
+        }
+        if self.keyboard.customizing {
+            for (button, delta) in [(Button::Up, -1), (Button::Down, 1)] {
+                if frame.pressed(button) && !self.previous.pressed(button) {
+                    self.keyboard.selected_setting =
+                        (self.keyboard.selected_setting as isize + delta).rem_euclid(6) as usize;
+                }
+            }
+            for (button, delta) in [(Button::Left, -1), (Button::Right, 1)] {
+                if frame.pressed(button) && !self.previous.pressed(button) {
+                    self.keyboard
+                        .settings
+                        .adjust(self.keyboard.selected_setting, delta);
+                }
+            }
+            return;
+        }
+        let settings = self.keyboard.settings.normalized();
         for (index, (button, row_delta, column_delta)) in [
             (Button::Up, -1, 0),
             (Button::Down, 1, 0),
@@ -338,7 +375,19 @@ impl MouseController {
         .into_iter()
         .enumerate()
         {
-            if self.repeat_direction(frame, button, index, elapsed, KEYBOARD_REPEAT_INTERVAL) {
+            let moved = if settings.repeat_enabled {
+                self.repeat_direction(
+                    frame,
+                    button,
+                    index,
+                    elapsed,
+                    f64::from(settings.repeat_delay_ms) / 1000.0,
+                    f64::from(settings.repeat_interval_ms) / 1000.0,
+                )
+            } else {
+                frame.pressed(button) && !self.previous.pressed(button)
+            };
+            if moved {
                 self.keyboard.move_selection(row_delta, column_delta);
             }
         }
@@ -351,7 +400,7 @@ impl MouseController {
             (Button::LeftShoulder, KeyboardInput::Tab),
         ] {
             if frame.pressed(button) && !self.previous.pressed(button) {
-                actions.push(Action::Keyboard(input));
+                actions.push(self.keyboard_action(input));
             }
         }
 
@@ -361,17 +410,35 @@ impl MouseController {
         if frame.pressed(Button::South) && !self.previous.pressed(Button::South) {
             match self.keyboard.selected_key() {
                 key @ KeyboardKey::Character(_) => {
-                    let character = key.character(self.keyboard.shift).unwrap();
-                    actions.push(Action::Keyboard(KeyboardInput::Character(character)));
+                    let character = key.character(self.keyboard.shifted(key)).unwrap();
+                    actions.push(self.keyboard_action(KeyboardInput::Character(character)));
                     self.keyboard.shift = false;
                 }
-                KeyboardKey::Backspace => actions.push(Action::Keyboard(KeyboardInput::Backspace)),
-                KeyboardKey::Enter => actions.push(Action::Keyboard(KeyboardInput::Enter)),
-                KeyboardKey::Escape => actions.push(Action::Keyboard(KeyboardInput::Escape)),
+                KeyboardKey::Backspace => {
+                    actions.push(self.keyboard_action(KeyboardInput::Backspace))
+                }
+                KeyboardKey::Enter => actions.push(self.keyboard_action(KeyboardInput::Enter)),
+                KeyboardKey::Escape => actions.push(self.keyboard_action(KeyboardInput::Escape)),
                 KeyboardKey::Shift => self.keyboard.shift = !self.keyboard.shift,
-                KeyboardKey::Space => actions.push(Action::Keyboard(KeyboardInput::Space)),
-                KeyboardKey::Tab => actions.push(Action::Keyboard(KeyboardInput::Tab)),
+                KeyboardKey::CapsLock => self.keyboard.caps_lock = !self.keyboard.caps_lock,
+                KeyboardKey::Control => {
+                    self.keyboard.modifiers.control = !self.keyboard.modifiers.control
+                }
+                KeyboardKey::Alt => self.keyboard.modifiers.alt = !self.keyboard.modifiers.alt,
+                KeyboardKey::Meta => self.keyboard.modifiers.meta = !self.keyboard.modifiers.meta,
+                KeyboardKey::Menu => actions.push(self.keyboard_action(KeyboardInput::Menu)),
+                KeyboardKey::Space => actions.push(self.keyboard_action(KeyboardInput::Space)),
+                KeyboardKey::Tab => actions.push(self.keyboard_action(KeyboardInput::Tab)),
             }
+        }
+    }
+
+    fn keyboard_action(&mut self, input: KeyboardInput) -> Action {
+        let modifiers = std::mem::take(&mut self.keyboard.modifiers);
+        if modifiers == KeyboardModifiers::default() {
+            Action::Keyboard(input)
+        } else {
+            Action::KeyboardChord(input, modifiers)
         }
     }
 }

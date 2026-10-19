@@ -8,12 +8,14 @@ use gamepad_desktop::runtime::DesktopRuntime;
 use gamepad_desktop::tray::{PanelControl, TrayAction, create_tray};
 use gamepad_desktop::{
     control::{KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS},
-    keyboard::{KEY_ROWS, KeyboardKey, KeyboardPresentation, KeyboardSession},
+    keyboard::{self, KeyboardPosition, KeyboardPresentation, KeyboardSession},
 };
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+
+mod keyboard_view;
 
 type SharedDesktop = Arc<Mutex<DesktopRuntime>>;
 
@@ -37,15 +39,7 @@ impl GamepadNavigatorApp {
 
 impl eframe::App for GamepadNavigatorApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        if ui.input(|input| input.viewport().close_requested())
-            && self.tray_error.is_none()
-            && !self.panel.exiting()
-        {
-            ui.ctx()
-                .send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            ui.ctx()
-                .send_viewport_cmd(egui::ViewportCommand::Visible(false));
-        }
+        handle_panel_close(ui.ctx(), &self.panel, self.tray_error.is_none());
         ui.ctx().request_repaint_after(Duration::from_millis(50));
         let keyboard = self
             .desktop
@@ -126,6 +120,29 @@ impl eframe::App for GamepadNavigatorApp {
                         self.desktop.lock().expect("desktop runtime lock").configure(state.settings);
                     }
                 });
+                egui::CollapsingHeader::new("Personalizar teclado QWERTY").show(ui, |ui| {
+                    let mut settings = state.keyboard.settings;
+                    let mut changed = ui.add(egui::Slider::new(&mut settings.width, 520..=1000).text("Largura (px)").step_by(20.0)).changed();
+                    ui.horizontal(|ui| {
+                        changed |= ui.selectable_value(&mut settings.position, KeyboardPosition::Top, "Em cima").changed();
+                        changed |= ui.selectable_value(&mut settings.position, KeyboardPosition::Bottom, "Embaixo").changed();
+                    });
+                    changed |= ui.add(egui::Slider::new(&mut settings.opacity, 160..=255).text("Opacidade")).changed();
+                    changed |= ui.checkbox(&mut settings.repeat_enabled, "Repetir direcional ao segurar").changed();
+                    ui.add_enabled_ui(settings.repeat_enabled, |ui| {
+                        changed |= ui.add(egui::Slider::new(&mut settings.repeat_delay_ms, 400..=1200).text("Espera inicial (ms)").step_by(50.0)).changed();
+                        changed |= ui.add(egui::Slider::new(&mut settings.repeat_interval_ms, 150..=1000).text("Intervalo (ms)").step_by(50.0)).changed();
+                    });
+                    if ui.button("Restaurar ajustes do teclado").clicked() {
+                        settings = Default::default();
+                        changed = true;
+                    }
+                    if changed {
+                        self.desktop.lock().expect("desktop runtime lock").configure_keyboard(settings);
+                    }
+                    ui.small("Com o teclado aberto, Start também abre estes ajustes pelo gamepad. As preferências são salvas ao voltar.");
+                    ui.small("QWERTY ANSI · Shift vale para a próxima letra · Caps fixa maiúsculas · Ctrl, Alt e Super combinam com a próxima tecla.");
+                });
                 if let Some(error) = &self.tray_error {
                     ui.colored_label(
                         Color32::LIGHT_RED,
@@ -156,15 +173,33 @@ impl eframe::App for GamepadNavigatorApp {
     }
 }
 
+fn handle_panel_close(context: &egui::Context, panel: &PanelControl, tray_available: bool) {
+    // Wayland cannot hide a native window. Linux closes the panel and waits in
+    // main's tray loop; the desktop worker and layer keyboard belong to the process.
+    if cfg!(target_os = "windows")
+        && context.input(|input| input.viewport().close_requested())
+        && tray_available
+        && !panel.exiting()
+    {
+        context.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        context.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+    }
+}
+
 fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession) {
     let screen = ui
         .ctx()
         .input(|input| input.viewport().monitor_size)
         .unwrap_or(egui::vec2(1920.0, 1080.0));
-    let size = egui::vec2(1200.0, 380.0);
+    let (width, height) = session.settings.surface_size();
+    let size = egui::vec2(width as f32, height as f32);
     let position = egui::pos2(
         (screen.x - size.x).max(0.0) / 2.0,
-        (screen.y - size.y - 20.0).max(0.0),
+        if session.settings.position == KeyboardPosition::Top {
+            20.0
+        } else {
+            (screen.y - size.y - 20.0).max(0.0)
+        },
     );
     let viewport = egui::ViewportId::from_hash_of("gamepad-navigator-keyboard");
     ui.ctx().show_viewport_deferred(
@@ -187,122 +222,7 @@ fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession) {
 
 fn keyboard_viewport_ui(ui: &mut egui::Ui, session: &KeyboardSession) {
     ui.ctx().request_repaint_after(Duration::from_millis(50));
-    egui::CentralPanel::default()
-        .frame(egui::Frame::new().fill(Color32::TRANSPARENT))
-        .show(ui, |ui| {
-            if !session.open {
-                return;
-            }
-            egui::Frame::new()
-                .fill(Color32::from_rgba_unmultiplied(15, 20, 31, 248))
-                .stroke(egui::Stroke::new(1.0, Color32::from_rgb(56, 189, 175)))
-                .corner_radius(16)
-                .inner_margin(egui::Margin::same(14))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 5.0);
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            RichText::new("TECLADO VIRTUAL")
-                                .strong()
-                                .size(12.0)
-                                .color(Color32::from_rgb(83, 225, 204)),
-                        );
-                        ui.label(
-                            RichText::new(format!(
-                                "Selecionada: {}",
-                                session.selected_key().label(session.shift)
-                            ))
-                            .strong()
-                            .size(18.0)
-                            .color(Color32::WHITE),
-                        );
-                        if session.shift {
-                            ui.label(
-                                RichText::new("SHIFT ATIVO")
-                                    .strong()
-                                    .size(11.0)
-                                    .color(Color32::from_rgb(255, 218, 120)),
-                            );
-                        }
-                        ui.with_layout(
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                ui.label(
-                                    RichText::new("D-pad navega  ·  A digita")
-                                        .size(13.0)
-                                        .color(Color32::from_gray(190)),
-                                );
-                            },
-                        );
-                    });
-                    ui.separator();
-
-                    let mut selected_index = 0;
-                    for row in KEY_ROWS {
-                        ui.horizontal_centered(|ui| {
-                            for key in *row {
-                                let selected = selected_index == session.selected_index();
-                                ui.add_sized(
-                                    [keyboard_key_width(*key), 48.0],
-                                    keyboard_key_button(*key, session.shift, selected),
-                                );
-                                selected_index += 1;
-                            }
-                        });
-                    }
-
-                    ui.separator();
-                    ui.label(
-                        RichText::new(
-                            "A digita   ·   B apaga   ·   X Enter   ·   Y Esc   ·   R3 espaço   ·   L1 Tab   ·   R1 Shift   ·   L3 fecha",
-                        )
-                        .size(13.0)
-                        .color(Color32::from_gray(205)),
-                    );
-                });
-        });
-}
-
-fn keyboard_key_width(key: KeyboardKey) -> f32 {
-    match key {
-        KeyboardKey::Backspace => 92.0,
-        KeyboardKey::Enter | KeyboardKey::Shift => 88.0,
-        KeyboardKey::Tab | KeyboardKey::Escape => 76.0,
-        KeyboardKey::Space => 360.0,
-        KeyboardKey::Character(_) => 58.0,
-    }
-}
-
-fn keyboard_key_button(key: KeyboardKey, shift: bool, selected: bool) -> egui::Button<'static> {
-    let special = !matches!(key, KeyboardKey::Character(_));
-    let fill = if selected {
-        Color32::from_rgb(13, 148, 136)
-    } else if special {
-        Color32::from_rgb(58, 72, 91)
-    } else {
-        Color32::from_rgb(38, 48, 64)
-    };
-    let label_size = match key {
-        KeyboardKey::Character(_) | KeyboardKey::Shift | KeyboardKey::Backspace => 19.0,
-        KeyboardKey::Space => 15.0,
-        _ => 16.0,
-    };
-    egui::Button::new(
-        RichText::new(key.label(shift))
-            .strong()
-            .size(label_size)
-            .color(Color32::WHITE),
-    )
-    .fill(fill)
-    .stroke(egui::Stroke::new(
-        if selected { 3.0 } else { 1.0 },
-        if selected {
-            Color32::from_rgb(130, 255, 231)
-        } else {
-            Color32::from_rgb(82, 97, 117)
-        },
-    ))
-    .corner_radius(8)
+    keyboard_view::show(ui, session);
 }
 
 fn shortcut_guide(ui: &mut egui::Ui, shortcuts: &[(&str, &str)]) {
@@ -370,6 +290,82 @@ fn main() -> eframe::Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn closing_windows_panel_hides_it_without_ending_the_tray_message_loop() {
+        let (panel, _) = PanelControl::new();
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .events
+            .push(egui::ViewportEvent::Close);
+        let mut output = egui::Context::default()
+            .run_pass(input, |context| handle_panel_close(context, &panel, true));
+        output.textures_delta.clear();
+        let commands = &output.viewport_output[&egui::ViewportId::ROOT].commands;
+        assert!(
+            commands
+                .iter()
+                .any(|command| matches!(command, egui::ViewportCommand::CancelClose))
+        );
+        assert!(
+            commands
+                .iter()
+                .any(|command| matches!(command, egui::ViewportCommand::Visible(false)))
+        );
+        assert!(!panel.exiting());
+    }
+
+    #[test]
+    fn explicit_exit_is_never_canceled_by_close_to_tray() {
+        let (panel, actions) = PanelControl::new();
+        panel.exit();
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .events
+            .push(egui::ViewportEvent::Close);
+        let mut output = egui::Context::default()
+            .run_pass(input, |context| handle_panel_close(context, &panel, true));
+        output.textures_delta.clear();
+        assert!(
+            !output.viewport_output[&egui::ViewportId::ROOT]
+                .commands
+                .iter()
+                .any(|command| matches!(command, egui::ViewportCommand::CancelClose))
+        );
+        assert_eq!(actions.try_recv().unwrap(), TrayAction::Exit);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn closing_linux_panel_keeps_the_service_but_allows_the_window_to_close() {
+        let (panel, actions) = PanelControl::new();
+        let mut input = egui::RawInput::default();
+        input
+            .viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .events
+            .push(egui::ViewportEvent::Close);
+        let mut output = egui::Context::default()
+            .run_pass(input, |context| handle_panel_close(context, &panel, true));
+        output.textures_delta.clear();
+        let commands = &output.viewport_output[&egui::ViewportId::ROOT].commands;
+        assert!(
+            !commands
+                .iter()
+                .any(|command| matches!(command, egui::ViewportCommand::CancelClose)),
+            "Wayland cannot hide a window with Visible(false); allow its actual close"
+        );
+        assert!(!panel.exiting());
+        assert!(actions.try_recv().is_err());
+    }
 
     #[test]
     fn shortcut_guides_fit_the_minimum_panel_width() {

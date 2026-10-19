@@ -313,3 +313,159 @@ fn l3_cannot_open_keyboard_when_paused_or_connecting_with_it_held() {
     controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
     assert!(!controller.keyboard.open);
 }
+
+#[test]
+fn keyboard_navigation_honors_repeat_delay_at_different_poll_rates() {
+    for tick_ms in [8, 20] {
+        let (mut controller, mut settings) = ready();
+        controller.set_system_keyboard_uses_gamepad(true);
+        controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+        let right = pressed(Button::Right);
+        let tick = Duration::from_millis(tick_ms);
+        controller.update(Some(&right), tick, &mut settings);
+        let selected = controller.keyboard.selected_key();
+
+        for _ in 0..(300 / tick_ms) {
+            controller.update(Some(&right), tick, &mut settings);
+            assert_eq!(
+                controller.keyboard.selected_key(),
+                selected,
+                "holding D-pad must not move every {tick_ms} ms"
+            );
+        }
+    }
+}
+
+#[test]
+fn ctrl_enter_uses_a_single_chord_and_releases_the_virtual_modifier() {
+    use gamepad_desktop::{control::KeyboardInput, keyboard::KeyboardModifiers};
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.keyboard.modifiers.control = true;
+    controller.keyboard.selected_row = 2;
+    controller.keyboard.selected_column = 12; // Enter
+    let actions = controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
+    assert_eq!(
+        actions,
+        vec![Action::KeyboardChord(
+            KeyboardInput::Enter,
+            KeyboardModifiers {
+                control: true,
+                ..Default::default()
+            }
+        )]
+    );
+    assert_eq!(controller.keyboard.modifiers, KeyboardModifiers::default());
+}
+
+#[test]
+fn keyboard_repeat_can_be_disabled_without_disabling_single_presses() {
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.keyboard.settings.repeat_enabled = false;
+    let right = pressed(Button::Right);
+    controller.update(Some(&right), TICK, &mut settings);
+    let column = controller.keyboard.selected_column;
+    for _ in 0..200 {
+        controller.update(Some(&right), TICK, &mut settings);
+    }
+    assert_eq!(controller.keyboard.selected_column, column);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.update(Some(&right), TICK, &mut settings);
+    assert_eq!(controller.keyboard.selected_column, column + 1);
+}
+
+#[test]
+fn keyboard_repeat_uses_the_configured_delay_and_interval() {
+    for tick_ms in [8, 20] {
+        let (mut controller, mut settings) = ready();
+        controller.set_system_keyboard_uses_gamepad(true);
+        controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+        let right = pressed(Button::Right);
+        let tick = Duration::from_millis(tick_ms);
+        let start = controller.keyboard.selected_column;
+        controller.update(Some(&right), tick, &mut settings);
+        for _ in 0..(1200 / tick_ms) {
+            controller.update(Some(&right), tick, &mut settings);
+        }
+        assert_eq!(controller.keyboard.selected_column, start + 3);
+    }
+}
+
+#[test]
+fn keyboard_settings_are_operated_by_gamepad_without_typing_into_the_app() {
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.update(Some(&pressed(Button::Start)), TICK, &mut settings);
+    assert!(controller.keyboard.customizing);
+    let width = controller.keyboard.settings.width;
+    assert!(
+        controller
+            .update(Some(&pressed(Button::Right)), TICK, &mut settings)
+            .is_empty()
+    );
+    assert_eq!(controller.keyboard.settings.width, width + 20);
+    for _ in 0..100 {
+        assert!(
+            controller
+                .update(Some(&pressed(Button::Right)), TICK, &mut settings)
+                .is_empty()
+        );
+    }
+    assert_eq!(controller.keyboard.settings.width, width + 20);
+    assert!(
+        controller
+            .update(Some(&pressed(Button::South)), TICK, &mut settings)
+            .is_empty()
+    );
+    controller.update(Some(&pressed(Button::Start)), TICK, &mut settings);
+    assert!(!controller.keyboard.customizing);
+    assert!(settings.enabled);
+}
+
+#[test]
+fn caps_and_shift_affect_letters_without_changing_number_keys() {
+    use gamepad_desktop::control::KeyboardInput;
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.keyboard.caps_lock = true;
+    assert_eq!(
+        controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
+        vec![Action::Keyboard(KeyboardInput::Character('A'))]
+    );
+    controller.update(Some(&pressed(Button::RightShoulder)), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
+        vec![Action::Keyboard(KeyboardInput::Character('a'))]
+    );
+    controller.keyboard.selected_row = 0;
+    controller.keyboard.selected_column = 1;
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
+        vec![Action::Keyboard(KeyboardInput::Character('1'))]
+    );
+}
+
+#[test]
+fn disconnect_leaves_keyboard_settings_mode_and_clears_pending_modifiers() {
+    let (mut controller, mut settings) = ready();
+    controller.set_system_keyboard_uses_gamepad(true);
+    controller.update(Some(&pressed(Button::LeftStick)), TICK, &mut settings);
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    controller.update(Some(&pressed(Button::Start)), TICK, &mut settings);
+    controller.keyboard.modifiers.alt = true;
+    controller.update(None, TICK, &mut settings);
+    assert!(!controller.keyboard.customizing);
+    assert!(!controller.keyboard.modifiers.alt);
+}

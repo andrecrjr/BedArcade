@@ -13,70 +13,229 @@ pub enum KeyboardKey {
     Enter,
     Escape,
     Shift,
+    CapsLock,
+    Control,
+    Alt,
+    Meta,
+    Menu,
     Space,
     Tab,
 }
 
+use KeyboardKey::{
+    Alt, Backspace, CapsLock, Character as C, Control, Enter, Menu, Meta, Shift, Space, Tab,
+};
+
+/// ANSI QWERTY typing block. Every row spans exactly 15 key units.
 pub const KEY_ROWS: &[&[KeyboardKey]] = &[
     &[
-        KeyboardKey::Character('1'),
-        KeyboardKey::Character('2'),
-        KeyboardKey::Character('3'),
-        KeyboardKey::Character('4'),
-        KeyboardKey::Character('5'),
-        KeyboardKey::Character('6'),
-        KeyboardKey::Character('7'),
-        KeyboardKey::Character('8'),
-        KeyboardKey::Character('9'),
-        KeyboardKey::Character('0'),
-        KeyboardKey::Character('-'),
-        KeyboardKey::Character('='),
-        KeyboardKey::Backspace,
+        C('`'),
+        C('1'),
+        C('2'),
+        C('3'),
+        C('4'),
+        C('5'),
+        C('6'),
+        C('7'),
+        C('8'),
+        C('9'),
+        C('0'),
+        C('-'),
+        C('='),
+        Backspace,
     ],
     &[
-        KeyboardKey::Character('q'),
-        KeyboardKey::Character('w'),
-        KeyboardKey::Character('e'),
-        KeyboardKey::Character('r'),
-        KeyboardKey::Character('t'),
-        KeyboardKey::Character('y'),
-        KeyboardKey::Character('u'),
-        KeyboardKey::Character('i'),
-        KeyboardKey::Character('o'),
-        KeyboardKey::Character('p'),
-        KeyboardKey::Character('['),
-        KeyboardKey::Character(']'),
-        KeyboardKey::Character('\\'),
+        Tab,
+        C('q'),
+        C('w'),
+        C('e'),
+        C('r'),
+        C('t'),
+        C('y'),
+        C('u'),
+        C('i'),
+        C('o'),
+        C('p'),
+        C('['),
+        C(']'),
+        C('\\'),
     ],
     &[
-        KeyboardKey::Character('a'),
-        KeyboardKey::Character('s'),
-        KeyboardKey::Character('d'),
-        KeyboardKey::Character('f'),
-        KeyboardKey::Character('g'),
-        KeyboardKey::Character('h'),
-        KeyboardKey::Character('j'),
-        KeyboardKey::Character('k'),
-        KeyboardKey::Character('l'),
-        KeyboardKey::Character(';'),
-        KeyboardKey::Character('\''),
-        KeyboardKey::Enter,
+        CapsLock,
+        C('a'),
+        C('s'),
+        C('d'),
+        C('f'),
+        C('g'),
+        C('h'),
+        C('j'),
+        C('k'),
+        C('l'),
+        C(';'),
+        C('\''),
+        Enter,
     ],
     &[
-        KeyboardKey::Shift,
-        KeyboardKey::Character('z'),
-        KeyboardKey::Character('x'),
-        KeyboardKey::Character('c'),
-        KeyboardKey::Character('v'),
-        KeyboardKey::Character('b'),
-        KeyboardKey::Character('n'),
-        KeyboardKey::Character('m'),
-        KeyboardKey::Character(','),
-        KeyboardKey::Character('.'),
-        KeyboardKey::Character('/'),
+        Shift,
+        C('z'),
+        C('x'),
+        C('c'),
+        C('v'),
+        C('b'),
+        C('n'),
+        C('m'),
+        C(','),
+        C('.'),
+        C('/'),
+        Shift,
     ],
-    &[KeyboardKey::Tab, KeyboardKey::Space, KeyboardKey::Escape],
+    &[Control, Meta, Alt, Space, Alt, Meta, Menu, Control],
 ];
+
+/// Width in quarter-key units; used by rendering and spatial navigation.
+pub fn key_width_quarters(row: usize, column: usize) -> u16 {
+    match (row, column) {
+        (0, 13) => 8,
+        (1, 0 | 13) => 6,
+        (2, 0) => 7,
+        (2, 12) | (3, 0) => 9,
+        (3, 11) => 11,
+        (4, 3) => 25,
+        (4, _) => 5,
+        _ => 4,
+    }
+}
+
+pub fn key_center(row: usize, column: usize) -> u16 {
+    (0..column)
+        .map(|i| key_width_quarters(row, i) * 2)
+        .sum::<u16>()
+        + key_width_quarters(row, column)
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum KeyboardPosition {
+    Top,
+    #[default]
+    Bottom,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct KeyboardSettings {
+    pub width: u16,
+    pub opacity: u8,
+    pub position: KeyboardPosition,
+    pub repeat_enabled: bool,
+    pub repeat_delay_ms: u16,
+    pub repeat_interval_ms: u16,
+}
+
+impl Default for KeyboardSettings {
+    fn default() -> Self {
+        Self {
+            width: 640,
+            opacity: 235,
+            position: KeyboardPosition::Bottom,
+            repeat_enabled: true,
+            repeat_delay_ms: 600,
+            repeat_interval_ms: 400,
+        }
+    }
+}
+
+impl KeyboardSettings {
+    pub fn normalized(mut self) -> Self {
+        self.width = self.width.clamp(520, 1000);
+        self.opacity = self.opacity.max(160);
+        self.repeat_delay_ms = self.repeat_delay_ms.clamp(400, 1200);
+        self.repeat_interval_ms = self.repeat_interval_ms.clamp(150, 1000);
+        self
+    }
+
+    pub fn surface_size(self) -> (u32, u32) {
+        let width = u32::from(self.normalized().width);
+        (width, width * 258 / 720)
+    }
+
+    pub fn load() -> Self {
+        settings_path()
+            .and_then(|p| std::fs::read(p).ok())
+            .and_then(|bytes| serde_json::from_slice::<Self>(&bytes).ok())
+            .unwrap_or_default()
+            .normalized()
+    }
+
+    pub fn save(self) -> Result<(), String> {
+        let path = settings_path().ok_or("Pasta de configuração indisponível")?;
+        std::fs::create_dir_all(path.parent().expect("settings directory"))
+            .map_err(|e| e.to_string())?;
+        let bytes = serde_json::to_vec_pretty(&self.normalized()).map_err(|e| e.to_string())?;
+        let pending = path.with_extension("pending");
+        std::fs::write(&pending, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(pending, path).map_err(|e| e.to_string())
+    }
+
+    pub fn adjust(&mut self, index: usize, direction: i16) {
+        fn step(value: u16, delta: i16) -> u16 {
+            value.saturating_add_signed(delta)
+        }
+        match index {
+            0 => self.width = step(self.width, direction * 20),
+            1 => {
+                self.position = match self.position {
+                    KeyboardPosition::Top => KeyboardPosition::Bottom,
+                    KeyboardPosition::Bottom => KeyboardPosition::Top,
+                }
+            }
+            2 => self.opacity = (i16::from(self.opacity) + direction * 10).clamp(160, 255) as u8,
+            3 => self.repeat_enabled = !self.repeat_enabled,
+            4 => self.repeat_delay_ms = step(self.repeat_delay_ms, direction * 50),
+            5 => self.repeat_interval_ms = step(self.repeat_interval_ms, direction * 50),
+            _ => return,
+        }
+        *self = self.normalized();
+    }
+
+    pub fn description(self, index: usize) -> String {
+        match index {
+            0 => format!("Tamanho: {} px", self.width),
+            1 => format!(
+                "Posição: {}",
+                if self.position == KeyboardPosition::Top {
+                    "em cima"
+                } else {
+                    "embaixo"
+                }
+            ),
+            2 => format!("Opacidade: {}%", u16::from(self.opacity) * 100 / 255),
+            3 => format!(
+                "Repetir ao segurar: {}",
+                if self.repeat_enabled { "sim" } else { "não" }
+            ),
+            4 => format!("Espera antes de repetir: {} ms", self.repeat_delay_ms),
+            5 => format!("Intervalo de repetição: {} ms", self.repeat_interval_ms),
+            _ => String::new(),
+        }
+    }
+}
+
+fn settings_path() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    let base = std::env::var_os("APPDATA").map(std::path::PathBuf::from);
+    #[cfg(not(target_os = "windows"))]
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")));
+    base.map(|p| p.join("gamepad-navigator/keyboard.json"))
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct KeyboardModifiers {
+    pub control: bool,
+    pub alt: bool,
+    pub meta: bool,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyboardSession {
@@ -86,6 +245,12 @@ pub struct KeyboardSession {
     pub selected_row: usize,
     pub selected_column: usize,
     pub shift: bool,
+    pub caps_lock: bool,
+    pub modifiers: KeyboardModifiers,
+    pub settings: KeyboardSettings,
+    pub customizing: bool,
+    pub selected_setting: usize,
+    navigation_x: Option<u16>,
 }
 
 impl Default for KeyboardSession {
@@ -95,13 +260,23 @@ impl Default for KeyboardSession {
             status: None,
             presentation: KeyboardPresentation::default(),
             selected_row: 2,
-            selected_column: 0,
+            selected_column: 1,
             shift: false,
+            caps_lock: false,
+            modifiers: KeyboardModifiers::default(),
+            settings: KeyboardSettings::default(),
+            customizing: false,
+            selected_setting: 0,
+            navigation_x: None,
         }
     }
 }
 
 impl KeyboardSession {
+    pub fn shifted(&self, key: KeyboardKey) -> bool {
+        self.shift ^ (self.caps_lock && matches!(key, KeyboardKey::Character('a'..='z')))
+    }
+
     pub fn selected_index(&self) -> usize {
         KEY_ROWS[..self.selected_row]
             .iter()
@@ -116,17 +291,27 @@ impl KeyboardSession {
 
     pub fn move_selection(&mut self, row_delta: isize, column_delta: isize) {
         if column_delta != 0 {
-            let row_len = KEY_ROWS[self.selected_row].len() as isize;
-            self.selected_column =
-                (self.selected_column as isize + column_delta).rem_euclid(row_len) as usize;
+            self.selected_column = (self.selected_column as isize + column_delta)
+                .clamp(0, KEY_ROWS[self.selected_row].len() as isize - 1)
+                as usize;
+            self.navigation_x = None;
             return;
         }
-
+        let x = *self
+            .navigation_x
+            .get_or_insert(key_center(self.selected_row, self.selected_column));
         self.selected_row =
             (self.selected_row as isize + row_delta).clamp(0, KEY_ROWS.len() as isize - 1) as usize;
-        self.selected_column = self
-            .selected_column
-            .min(KEY_ROWS[self.selected_row].len() - 1);
+        self.selected_column = (0..KEY_ROWS[self.selected_row].len())
+            .min_by_key(|column| {
+                let center = key_center(self.selected_row, *column);
+                let distance = center.abs_diff(x);
+                (
+                    distance.saturating_sub(key_width_quarters(self.selected_row, *column)),
+                    distance,
+                )
+            })
+            .expect("nonempty QWERTY row");
     }
 }
 
@@ -135,10 +320,15 @@ impl KeyboardKey {
         match self.character(shift) {
             Some(character) => character.to_string(),
             None => match self {
-                Self::Backspace => "⌫".to_owned(),
+                Self::Backspace => "Backspace".to_owned(),
                 Self::Enter => "Enter".to_owned(),
                 Self::Escape => "Esc".to_owned(),
-                Self::Shift => "⇧".to_owned(),
+                Self::Shift => "Shift".to_owned(),
+                Self::CapsLock => "Caps".to_owned(),
+                Self::Control => "Ctrl".to_owned(),
+                Self::Alt => "Alt".to_owned(),
+                Self::Meta => "Super".to_owned(),
+                Self::Menu => "Menu".to_owned(),
                 Self::Space => "Espaço".to_owned(),
                 Self::Tab => "Tab".to_owned(),
                 Self::Character(_) => unreachable!(),
@@ -153,6 +343,7 @@ impl KeyboardKey {
         Some(if shift {
             match character {
                 'a'..='z' => character.to_ascii_uppercase(),
+                '`' => '~',
                 '1' => '!',
                 '2' => '@',
                 '3' => '#',

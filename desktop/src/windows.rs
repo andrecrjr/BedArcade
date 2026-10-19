@@ -1,7 +1,7 @@
 use enigo::{Axis as ScrollAxis, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 
 use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
-use crate::keyboard::{KeyboardPresentation, KeyboardSession};
+use crate::keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession};
 
 pub struct Platform {
     input: Enigo,
@@ -60,17 +60,10 @@ impl Platform {
                 },
                 Direction::Click,
             ),
-            Action::Keyboard(input) => self.input.key(
-                match input {
-                    KeyboardInput::Character(character) => Key::Unicode(character),
-                    KeyboardInput::Backspace => Key::Backspace,
-                    KeyboardInput::Enter => Key::Return,
-                    KeyboardInput::Escape => Key::Escape,
-                    KeyboardInput::Space => Key::Space,
-                    KeyboardInput::Tab => Key::Tab,
-                },
-                Direction::Click,
-            ),
+            Action::Keyboard(input) => {
+                self.emit_keyboard_input(input, KeyboardModifiers::default())
+            }
+            Action::KeyboardChord(input, modifiers) => self.emit_keyboard_input(input, modifiers),
             Action::NextWindow => {
                 let pressed = self.input.key(Key::Alt, Direction::Press);
                 let tab = if pressed.is_ok() {
@@ -83,6 +76,40 @@ impl Platform {
             }
         };
         result.map_err(|error| format!("Falha enviando entrada ao Windows: {error}"))
+    }
+
+    fn emit_keyboard_input(
+        &mut self,
+        input: KeyboardInput,
+        modifiers: KeyboardModifiers,
+    ) -> Result<(), enigo::InputError> {
+        let key = match input {
+            KeyboardInput::Character(character) => Key::Unicode(character),
+            KeyboardInput::Backspace => Key::Backspace,
+            KeyboardInput::Enter => Key::Return,
+            KeyboardInput::Escape => Key::Escape,
+            KeyboardInput::Space => Key::Space,
+            KeyboardInput::Tab => Key::Tab,
+            KeyboardInput::Menu => Key::Apps,
+        };
+        let modifiers: Vec<_> = [
+            (modifiers.control, Key::Control),
+            (modifiers.alt, Key::Alt),
+            (modifiers.meta, Key::Meta),
+        ]
+        .into_iter()
+        .filter_map(|(enabled, key)| enabled.then_some(key))
+        .collect();
+        let mut result = Ok(());
+        for modifier in &modifiers {
+            result = result.and_then(|()| self.input.key(*modifier, Direction::Press));
+        }
+        result = result.and_then(|()| self.input.key(key, Direction::Click));
+        for modifier in modifiers.iter().rev() {
+            let released = self.input.key(*modifier, Direction::Release);
+            result = result.and(released);
+        }
+        result
     }
 }
 

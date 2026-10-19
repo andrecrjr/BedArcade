@@ -26,10 +26,10 @@ use wayland_client::{
     protocol::{wl_output, wl_seat, wl_shm, wl_surface},
 };
 
-use crate::keyboard::{KEY_ROWS, KeyboardKey, KeyboardSession};
+use crate::keyboard::{self, KeyboardPosition, KeyboardSession, KeyboardSettings};
 
-const SURFACE_WIDTH: u32 = 1200;
-const SURFACE_HEIGHT: u32 = 380;
+#[path = "keyboard_view.rs"]
+mod keyboard_view;
 
 pub struct WaylandKeyboardOverlay {
     connection: Connection,
@@ -58,9 +58,10 @@ impl WaylandKeyboardOverlay {
             Some("gamepad-navigator-keyboard"),
             None,
         );
+        let (surface_width, surface_height) = KeyboardSettings::default().surface_size();
         layer.set_anchor(Anchor::BOTTOM);
         layer.set_margin(0, 0, 20, 0);
-        layer.set_size(SURFACE_WIDTH, SURFACE_HEIGHT);
+        layer.set_size(surface_width, surface_height);
         layer.set_keyboard_interactivity(KeyboardInteractivity::None);
         let input_region = Region::new(&compositor)
             .map_err(|error| format!("Não foi possível criar a região sem mouse: {error}"))?;
@@ -79,14 +80,14 @@ impl WaylandKeyboardOverlay {
             context: egui::Context::default(),
             renderer: EguiSoftwareRender::new(ColorFieldOrder::Bgra).with_caching(true),
             session: KeyboardSession::default(),
-            width: SURFACE_WIDTH,
-            height: SURFACE_HEIGHT,
+            width: surface_width,
+            height: surface_height,
             configured: false,
             dirty: true,
         };
         state.context.set_visuals(egui::Visuals::dark());
         state.pool = Some(
-            SlotPool::new((SURFACE_WIDTH * SURFACE_HEIGHT * 4) as usize, &state.shm)
+            SlotPool::new((surface_width * surface_height * 4) as usize, &state.shm)
                 .map_err(|error| format!("Não foi possível alocar o teclado Wayland: {error}"))?,
         );
 
@@ -105,6 +106,20 @@ impl WaylandKeyboardOverlay {
     }
 
     pub fn update(&mut self, session: &KeyboardSession) -> Result<(), String> {
+        if self.state.session.settings != session.settings {
+            let (width, height) = session.settings.surface_size();
+            self.state
+                .layer
+                .set_anchor(if session.settings.position == KeyboardPosition::Top {
+                    Anchor::TOP
+                } else {
+                    Anchor::BOTTOM
+                });
+            self.state.layer.set_margin(20, 0, 20, 0);
+            self.state.layer.set_size(width, height);
+            self.state.width = width;
+            self.state.height = height;
+        }
         if self.state.session != *session {
             self.state.session = session.clone();
             self.state.dirty = true;
@@ -217,122 +232,7 @@ impl OverlayState {
 }
 
 fn keyboard_ui(ui: &mut egui::Ui, session: &KeyboardSession) {
-    egui::CentralPanel::default()
-        .frame(egui::Frame::new().fill(egui::Color32::TRANSPARENT))
-        .show_inside(ui, |ui| {
-            egui::Frame::new()
-                .fill(egui::Color32::from_rgba_unmultiplied(15, 20, 31, 248))
-                .stroke(egui::Stroke::new(
-                    1.0_f32,
-                    egui::Color32::from_rgb(56, 189, 175),
-                ))
-                .corner_radius(16)
-                .inner_margin(egui::Margin::same(14))
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing = egui::vec2(6.0, 5.0);
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new("TECLADO VIRTUAL")
-                                .strong()
-                                .size(12.0)
-                                .color(egui::Color32::from_rgb(83, 225, 204)),
-                        );
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "Selecionada: {}",
-                                session.selected_key().label(session.shift)
-                            ))
-                            .strong()
-                            .size(18.0)
-                            .color(egui::Color32::WHITE),
-                        );
-                        if session.shift {
-                            ui.label(
-                                egui::RichText::new("SHIFT ATIVO")
-                                    .strong()
-                                    .size(11.0)
-                                    .color(egui::Color32::from_rgb(255, 218, 120)),
-                            );
-                        }
-                        ui.with_layout(
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| {
-                                ui.label(
-                                    egui::RichText::new("D-pad navega  ·  A digita")
-                                        .size(13.0)
-                                        .color(egui::Color32::from_gray(190)),
-                                );
-                            },
-                        );
-                    });
-                    ui.separator();
-
-                    let mut selected_index = 0;
-                    for row in KEY_ROWS {
-                        ui.horizontal_centered(|ui| {
-                            for key in *row {
-                                let selected = selected_index == session.selected_index();
-                                ui.add_sized(
-                                    [keyboard_key_width(*key), 48.0],
-                                    keyboard_key_button(*key, session.shift, selected),
-                                );
-                                selected_index += 1;
-                            }
-                        });
-                    }
-
-                    ui.separator();
-                    ui.label(
-                        egui::RichText::new(
-                            "A digita   ·   B apaga   ·   X Enter   ·   Y Esc   ·   R3 espaço   ·   L1 Tab   ·   R1 Shift   ·   L3 fecha",
-                        )
-                        .size(13.0)
-                        .color(egui::Color32::from_gray(205)),
-                    );
-                });
-        });
-}
-
-fn keyboard_key_width(key: KeyboardKey) -> f32 {
-    match key {
-        KeyboardKey::Backspace => 92.0,
-        KeyboardKey::Enter | KeyboardKey::Shift => 88.0,
-        KeyboardKey::Tab | KeyboardKey::Escape => 76.0,
-        KeyboardKey::Space => 360.0,
-        KeyboardKey::Character(_) => 58.0,
-    }
-}
-
-fn keyboard_key_button(key: KeyboardKey, shift: bool, selected: bool) -> egui::Button<'static> {
-    let special = !matches!(key, KeyboardKey::Character(_));
-    let fill = if selected {
-        egui::Color32::from_rgb(13, 148, 136)
-    } else if special {
-        egui::Color32::from_rgb(58, 72, 91)
-    } else {
-        egui::Color32::from_rgb(38, 48, 64)
-    };
-    let label_size = match key {
-        KeyboardKey::Character(_) | KeyboardKey::Shift | KeyboardKey::Backspace => 19.0,
-        KeyboardKey::Space => 15.0,
-        _ => 16.0,
-    };
-    egui::Button::new(
-        egui::RichText::new(key.label(shift))
-            .strong()
-            .size(label_size)
-            .color(egui::Color32::WHITE),
-    )
-    .fill(fill)
-    .stroke(egui::Stroke::new(
-        if selected { 3.0_f32 } else { 1.0_f32 },
-        if selected {
-            egui::Color32::from_rgb(130, 255, 231)
-        } else {
-            egui::Color32::from_rgb(82, 97, 117)
-        },
-    ))
-    .corner_radius(8)
+    keyboard_view::show(ui, session);
 }
 
 impl CompositorHandler for OverlayState {

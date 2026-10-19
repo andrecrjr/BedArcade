@@ -4,6 +4,22 @@ use evdev::uinput::VirtualDevice;
 
 use super::*;
 
+#[test]
+fn every_qwerty_character_has_a_linux_key_mapping() {
+    for row in crate::keyboard::KEY_ROWS {
+        for key in *row {
+            for shifted in [false, true] {
+                if let Some(character) = key.character(shifted) {
+                    assert!(
+                        ascii_key(character).is_some(),
+                        "unsupported keycap: {character}"
+                    );
+                }
+            }
+        }
+    }
+}
+
 fn node(device: &mut VirtualDevice) -> std::path::PathBuf {
     device
         .enumerate_dev_nodes_blocking()

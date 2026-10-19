@@ -6,7 +6,7 @@ use std::env;
 
 use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
 use crate::{
-    keyboard::{KeyboardPresentation, KeyboardSession},
+    keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession},
     wayland_keyboard::WaylandKeyboardOverlay,
 };
 
@@ -124,7 +124,10 @@ impl Platform {
                 };
                 self.emit_key(code)
             }
-            Action::Keyboard(input) => self.emit_keyboard_input(input),
+            Action::Keyboard(input) => {
+                self.emit_keyboard_input(input, KeyboardModifiers::default())
+            }
+            Action::KeyboardChord(input, modifiers) => self.emit_keyboard_input(input, modifiers),
             Action::NextWindow => {
                 let press = self.keyboard.emit(&[
                     key_event(KeyCode::KEY_LEFTALT, 1),
@@ -147,7 +150,11 @@ impl Platform {
         ])
     }
 
-    fn emit_keyboard_input(&mut self, input: KeyboardInput) -> std::io::Result<()> {
+    fn emit_keyboard_input(
+        &mut self,
+        input: KeyboardInput,
+        modifiers: KeyboardModifiers,
+    ) -> std::io::Result<()> {
         let (key, shifted) = match input {
             KeyboardInput::Character(character) => ascii_key(character)
                 .ok_or_else(|| std::io::Error::other("caractere não suportado"))?,
@@ -156,25 +163,35 @@ impl Platform {
             KeyboardInput::Escape => (KeyCode::KEY_ESC, false),
             KeyboardInput::Space => (KeyCode::KEY_SPACE, false),
             KeyboardInput::Tab => (KeyCode::KEY_TAB, false),
+            KeyboardInput::Menu => (KeyCode::KEY_COMPOSE, false),
         };
         let press = |code: KeyCode| InputEvent::new(EventType::KEY.0, code.0, 1);
         let release = |code: KeyCode| InputEvent::new(EventType::KEY.0, code.0, 0);
 
-        if shifted {
-            self.keyboard.emit(&[
-                press(KeyCode::KEY_LEFTSHIFT),
-                press(key),
-                release(key),
-                release(KeyCode::KEY_LEFTSHIFT),
-            ])
-        } else {
-            self.keyboard.emit(&[press(key), release(key)])
-        }
+        let modifiers: Vec<_> = [
+            (modifiers.control, KeyCode::KEY_LEFTCTRL),
+            (modifiers.alt, KeyCode::KEY_LEFTALT),
+            (modifiers.meta, KeyCode::KEY_LEFTMETA),
+            (shifted, KeyCode::KEY_LEFTSHIFT),
+        ]
+        .into_iter()
+        .filter_map(|(enabled, key)| enabled.then_some(key))
+        .collect();
+        let events: Vec<_> = modifiers
+            .iter()
+            .copied()
+            .map(press)
+            .chain([press(key), release(key)])
+            .chain(modifiers.iter().rev().copied().map(release))
+            .collect();
+        self.keyboard.emit(&events)
     }
 }
 
 fn ascii_key(character: char) -> Option<(KeyCode, bool)> {
     let (code, shifted) = match character {
+        '`' => (KeyCode::KEY_GRAVE, false),
+        '~' => (KeyCode::KEY_GRAVE, true),
         'a' | 'A' => (KeyCode::KEY_A, character.is_ascii_uppercase()),
         'b' | 'B' => (KeyCode::KEY_B, character.is_ascii_uppercase()),
         'c' | 'C' => (KeyCode::KEY_C, character.is_ascii_uppercase()),

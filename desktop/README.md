@@ -12,9 +12,15 @@ Aplicativo Rust independente da extensão do navegador, planejado para Windows e
 
 L3 abre um teclado próprio. No Windows e no Linux/X11 ele usa uma janela transparente, sempre no topo, sem foco e com os cliques do mouse repassados. Em Wayland, usa `wlr-layer-shell` com interação de teclado desativada e região de mouse vazia; o COSMIC atual oferece esse protocolo. O GNOME Wayland não oferece essa camada, então o teclado próprio informa que não está disponível nessa sessão. O app não muda o foco nem captura o campo de texto; os eventos de tecla seguem para o aplicativo que já estava ativo.
 
-O teclado mostra QWERTY com letras, números, símbolos, Shift, Tab, Enter, Esc, espaço e Backspace. No Windows, caracteres são enviados como Unicode. No Linux, o dispositivo `uinput` envia códigos de tecla do mapa US/QWERTY; layouts diferentes podem produzir símbolos diferentes e caracteres acentuados ainda precisam de suporte de layout.
+O teclado usa o bloco QWERTY ANSI com cinco fileiras alinhadas por unidades físicas: Tab à esquerda de Q, Caps à esquerda de A, dois Shift, Backspace, Enter e uma barra de espaço de 6,25 unidades. Ctrl, Alt e Super combinam com a próxima tecla e depois são liberados; Caps mantém maiúsculas e Shift vale para o próximo caractere. Esc continua disponível no botão superior do gamepad. No Windows, caracteres são enviados como Unicode. No Linux, o dispositivo `uinput` envia códigos de tecla do mapa US/QWERTY; layouts diferentes podem produzir símbolos diferentes e caracteres acentuados ainda precisam de suporte de layout.
 
-O direcional move uma tecla por toque. Ao segurar, repete após 400 ms e depois a cada 180 ms. A tecla selecionada e o estado do Shift aparecem no cabeçalho; os botões especiais têm cor própria e teclas maiores.
+O direcional move uma tecla por toque. Por padrão, segurar repete após 600 ms e depois a cada 400 ms. A navegação vertical considera a posição e a largura real das teclas e preserva a coluna ao atravessar a barra de espaço. As bordas laterais seguram a seleção. O tamanho padrão é 640 × 229 px, e as duas plataformas compartilham o mesmo desenho.
+
+![Prévia renderizada do teclado QWERTY](keyboard-preview.png)
+
+Com o teclado aberto, **Start** abre os ajustes: cima/baixo escolhe uma opção e esquerda/direita altera. Start volta à digitação e salva; L3 fecha e salva. Também existe a seção **Personalizar teclado QWERTY** no painel. É possível ajustar largura (520–1000 px, com altura proporcional), posição em cima/embaixo, opacidade, espera inicial, intervalo e desativar a repetição para avançar somente por toque. Os ajustes ficam em `~/.config/gamepad-navigator/keyboard.json` (ou `$XDG_CONFIG_HOME`) no Linux e `%APPDATA%/gamepad-navigator/keyboard.json` no Windows.
+
+A pesquisa e as limitações de foco e layout estão em [KEYBOARD_RESEARCH.md](KEYBOARD_RESEARCH.md). Uma prévia do desenho real pode ser gerada no Linux com `cargo run --manifest-path desktop/Cargo.toml --example keyboard_preview`; os arquivos PPM ficam em `/tmp/gamepad-keyboard-preview`.
 
 A navegação item por item depende do suporte de acessibilidade de cada aplicativo e navegador. No Linux, a árvore de acessibilidade costuma ser disponibilizada por AT-SPI. No Windows, navegadores podem expor informações por APIs diferentes, então o suporte deve ser validado por navegador.
 
@@ -49,13 +55,15 @@ O painel mostra os comandos do modo mouse e do teclado visual, com nomes por pos
 
 No modo de teclado, o mouse fica pausado para evitar que o analógico mova o ponteiro por baixo das teclas. O teclado em Wayland só aparece em compositores com `wlr-layer-shell`; no GNOME Wayland essa garantia não está disponível. Se o protocolo não existir ou a camada falhar, o painel explica o motivo e o modo não envia teclas sem que o usuário veja o teclado.
 
-Depois de conectar/reconectar ou retomar, solte os botões e centralize os analógicos antes de controlar o desktop. Pausa, desconexão e encerramento do app soltam os cliques mantidos. O painel permite ajustar velocidade e zona morta; as configurações desta primeira versão valem para a sessão.
+Depois de conectar/reconectar ou retomar, solte os botões e centralize os analógicos antes de controlar o desktop. Pausa, desconexão e encerramento do app soltam os cliques mantidos. O painel permite ajustar velocidade e zona morta para a sessão. As preferências do teclado são salvas entre execuções.
 
 ### Bandeja do sistema
 
 O **X** recolhe o painel e mantém o controle do desktop funcionando. O ícone de gamepad fica na bandeja, perto do relógio, com as ações **Abrir painel**, **Recolher painel** e **Encerrar aplicativo**. Também existe um botão de encerramento no próprio painel.
 
 No Linux, a bandeja usa StatusNotifierItem sem exigir GTK. O ambiente precisa oferecer uma área de notificações compatível; o COSMIC desta máquina oferece. Quando a bandeja está disponível, fechar o painel o oculta e mantém o serviço e o teclado ativos; a ação **Abrir painel** restaura a janela. Se a criação da bandeja falhar, o painel mostra o erro e fechar a janela encerra o app para não deixá-lo sem acesso.
+
+No Linux, o X permite fechar a janela nativa e o processo aguarda a reabertura pela bandeja, preservando o controle do desktop. No Windows, o painel é ocultado mantendo a fila de eventos da bandeja. Isso evita depender de `set_visible(false)`, que o Winit não suporta em Wayland.
 
 ### Integração com o sistema
 

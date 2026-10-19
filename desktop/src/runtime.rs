@@ -10,7 +10,7 @@ use std::{
 use crate::{
     control::{Action, ControlSettings, GamepadFrame, MouseController},
     gamepads::{GamepadInfo, Gamepads},
-    keyboard::KeyboardSession,
+    keyboard::{KeyboardSession, KeyboardSettings},
     platform::Platform,
 };
 
@@ -35,7 +35,9 @@ pub struct DesktopRuntime {
 
 impl Default for DesktopRuntime {
     fn default() -> Self {
-        let state = Arc::new(Mutex::new(RuntimeState::default()));
+        let mut initial = RuntimeState::default();
+        initial.keyboard.settings = KeyboardSettings::load();
+        let state = Arc::new(Mutex::new(initial));
         let stop = Arc::new(AtomicBool::new(false));
         let worker_state = Arc::clone(&state);
         let worker_stop = Arc::clone(&stop);
@@ -64,6 +66,14 @@ impl DesktopRuntime {
         self.state.lock().expect("runtime state lock").settings = settings;
     }
 
+    pub fn configure_keyboard(&self, settings: KeyboardSettings) {
+        self.state
+            .lock()
+            .expect("runtime state lock")
+            .keyboard
+            .settings = settings.normalized();
+    }
+
     pub fn select_controller(&self, selected: Option<u32>) {
         self.state.lock().expect("runtime state lock").selected = selected;
     }
@@ -90,6 +100,8 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     let mut gamepads = Gamepads::new().map_err(|error| format!("SDL3: {error}"))?;
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
     let mut controller = MouseController::default();
+    controller.keyboard.settings = state.lock().expect("runtime state lock").keyboard.settings;
+    let mut saved_settings = controller.keyboard.settings;
     controller.set_system_keyboard_uses_gamepad(platform.system_keyboard_uses_gamepad());
     controller.keyboard.presentation = platform.keyboard_presentation();
     controller.keyboard.status = platform.keyboard_overlay_error().map(str::to_owned);
@@ -159,6 +171,13 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                 controller.keyboard.status = Some(error);
                 state.lock().expect("runtime state lock").keyboard = controller.keyboard.clone();
             }
+            if !controller.keyboard.customizing && controller.keyboard.settings != saved_settings {
+                saved_settings = controller.keyboard.settings;
+                if let Err(error) = saved_settings.save() {
+                    controller.keyboard.status =
+                        Some(format!("Não foi possível salvar ajustes: {error}"));
+                }
+            }
             thread::sleep(Duration::from_millis(8));
         }
         Ok(())
@@ -169,6 +188,9 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
         }
     }
     let _ = platform.update_keyboard_overlay(&controller.keyboard);
+    if controller.keyboard.settings != saved_settings {
+        let _ = controller.keyboard.settings.save();
+    }
     outcome
 }
 
@@ -178,6 +200,7 @@ fn update_control(
     frame: Option<&GamepadFrame>,
     elapsed: Duration,
 ) -> Vec<Action> {
+    controller.keyboard.settings = state.keyboard.settings;
     let actions = controller.update(frame, elapsed, &mut state.settings);
     state.keyboard = controller.keyboard.clone();
     actions
