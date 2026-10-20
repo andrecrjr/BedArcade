@@ -120,7 +120,8 @@ impl GamepadFrame {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct ControlSettings {
     pub enabled: bool,
     pub speed: f64,
@@ -134,6 +135,14 @@ impl Default for ControlSettings {
             speed: 900.0,
             deadzone: 0.2,
         }
+    }
+}
+
+impl ControlSettings {
+    pub fn normalized(mut self) -> Self {
+        self.speed = self.speed.clamp(100.0, 2400.0);
+        self.deadzone = self.deadzone.clamp(0.05, 0.5);
+        self
     }
 }
 

@@ -22,6 +22,7 @@ pub enum KeyboardKey {
     Tab,
 }
 
+pub use crate::i18n::{Locale, Text};
 use KeyboardKey::{
     Alt, Backspace, CapsLock, Character as C, Control, Enter, Menu, Meta, Shift, Space, Tab,
 };
@@ -198,23 +199,45 @@ impl KeyboardSettings {
     }
 
     pub fn description(self, index: usize) -> String {
+        self.description_in(Locale::PortugueseBrazil, index)
+    }
+
+    pub fn description_in(self, locale: Locale, index: usize) -> String {
         match index {
-            0 => format!("Tamanho: {} px", self.width),
+            0 => format!("{}: {} px", locale.text(Text::KeyboardWidth), self.width),
             1 => format!(
-                "Posição: {}",
+                "{}: {}",
+                locale.text(Text::KeyboardPosition),
                 if self.position == KeyboardPosition::Top {
-                    "em cima"
+                    locale.text(Text::Top)
                 } else {
-                    "embaixo"
+                    locale.text(Text::Bottom)
                 }
             ),
-            2 => format!("Opacidade: {}%", u16::from(self.opacity) * 100 / 255),
-            3 => format!(
-                "Repetir ao segurar: {}",
-                if self.repeat_enabled { "sim" } else { "não" }
+            2 => format!(
+                "{}: {}%",
+                locale.text(Text::KeyboardOpacity),
+                u16::from(self.opacity) * 100 / 255
             ),
-            4 => format!("Espera antes de repetir: {} ms", self.repeat_delay_ms),
-            5 => format!("Intervalo de repetição: {} ms", self.repeat_interval_ms),
+            3 => format!(
+                "{}: {}",
+                locale.text(Text::KeyboardRepeat),
+                locale.text(if self.repeat_enabled {
+                    Text::Yes
+                } else {
+                    Text::No
+                })
+            ),
+            4 => format!(
+                "{}: {} ms",
+                locale.text(Text::KeyboardRepeatDelay),
+                self.repeat_delay_ms
+            ),
+            5 => format!(
+                "{}: {} ms",
+                locale.text(Text::KeyboardRepeatInterval),
+                self.repeat_interval_ms
+            ),
             _ => String::new(),
         }
     }
@@ -239,6 +262,7 @@ pub struct KeyboardModifiers {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyboardSession {
+    pub locale: Locale,
     pub focused_input: Option<crate::focused_input::FocusedInput>,
     pub open: bool,
     pub status: Option<String>,
@@ -257,6 +281,7 @@ pub struct KeyboardSession {
 impl Default for KeyboardSession {
     fn default() -> Self {
         Self {
+            locale: Locale::default(),
             focused_input: None,
             open: false,
             status: None,
@@ -275,6 +300,14 @@ impl Default for KeyboardSession {
 }
 
 impl KeyboardSession {
+    pub(crate) fn with_locale(locale: Locale, settings: KeyboardSettings) -> Self {
+        Self {
+            locale,
+            settings,
+            ..Self::default()
+        }
+    }
+
     pub fn shifted(&self, key: KeyboardKey) -> bool {
         self.shift ^ (self.caps_lock && matches!(key, KeyboardKey::Character('a'..='z')))
     }
@@ -335,6 +368,14 @@ impl KeyboardKey {
                 Self::Tab => "Tab".to_owned(),
                 Self::Character(_) => unreachable!(),
             },
+        }
+    }
+
+    pub fn label_in(self, shift: bool, locale: Locale) -> String {
+        if self == Self::Space {
+            locale.text(Text::Space).to_owned()
+        } else {
+            self.label(shift)
         }
     }
 

@@ -1,7 +1,7 @@
 // Compiled by both egui integrations so the Windows and Wayland layouts stay identical.
 use super::{egui, keyboard};
 use egui::{Align2, Color32, FontId, Rect, Stroke, StrokeKind, Vec2};
-use keyboard::{KEY_ROWS, KeyboardKey, KeyboardSession, key_width_quarters};
+use keyboard::{KEY_ROWS, KeyboardKey, KeyboardSession, Text, key_width_quarters};
 
 #[allow(deprecated)] // show_inside bridges egui 0.34 (software) and 0.37 (eframe).
 pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
@@ -32,7 +32,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 StrokeKind::Inside,
             );
             let title = if session.customizing {
-                "AJUSTES DO TECLADO"
+                session.locale.text(Text::KeyboardSettingsTitle)
             } else {
                 "QWERTY"
             };
@@ -44,7 +44,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 accent,
             );
             let active = if session.customizing {
-                "Cima/baixo escolhe · lados altera".to_owned()
+                session.locale.text(Text::KeyboardMoveAdjust).to_owned()
             } else {
                 format!(
                     "{}{}{}{}{}",
@@ -62,7 +62,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                     if session.caps_lock { "Caps · " } else { "" },
                     session
                         .selected_key()
-                        .label(session.shifted(session.selected_key()))
+                        .label_in(session.shifted(session.selected_key()), session.locale)
                 )
             };
             painter.text(
@@ -92,7 +92,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                     painter.text(
                         rect.left_center() + Vec2::new(10.0 * scale, 0.0),
                         Align2::LEFT_CENTER,
-                        session.settings.description(index),
+                        session.settings.description_in(session.locale, index),
                         FontId::proportional(13.0 * scale),
                         if selected { accent } else { Color32::WHITE },
                     );
@@ -142,9 +142,9 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                         );
                         let label = match key {
                             KeyboardKey::Character('a'..='z') => {
-                                key.label(false).to_ascii_uppercase()
+                                key.label_in(false, session.locale).to_ascii_uppercase()
                             }
-                            _ => key.label(session.shifted(key)),
+                            _ => key.label_in(session.shifted(key), session.locale),
                         };
                         let font_size = if matches!(key, KeyboardKey::Character(_)) {
                             17.0
@@ -161,7 +161,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                         if let KeyboardKey::Character(character) = key
                             && !character.is_ascii_alphabetic()
                         {
-                            let alternate = key.label(!session.shift);
+                            let alternate = key.label_in(!session.shift, session.locale);
                             painter.text(
                                 rect.min + Vec2::new(5.0, 3.0) * scale,
                                 Align2::LEFT_TOP,
@@ -175,9 +175,9 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 }
             }
             let help = if session.customizing {
-                "Start voltar e salvar · R3 fechar"
+                session.locale.text(Text::KeyboardCustomizeHelp)
             } else {
-                "A digitar · B apagar · L3 espaço · R1 Shift · Start ajustes"
+                session.locale.text(Text::KeyboardTypingHelp)
             };
             painter.text(
                 point(360.0, 233.0),
@@ -190,7 +190,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                 painter.text(
                     point(360.0, 249.0),
                     Align2::CENTER_CENTER,
-                    "X Enter · Y Esc · L1 Tab · R3 fechar",
+                    session.locale.text(Text::KeyboardNavigationHelp),
                     FontId::proportional(10.0 * scale),
                     Color32::from_gray(165),
                 );

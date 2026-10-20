@@ -4,7 +4,8 @@ use std::sync::{
     mpsc::{self, Receiver, Sender},
 };
 
-use eframe::egui::{Context, ViewportCommand};
+use crate::i18n::{Locale, Text};
+use eframe::egui::{Context, IconData, ViewportCommand};
 use tray_icon::{
     Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -20,6 +21,21 @@ pub struct PanelControl {
     context: Mutex<Option<Context>>,
     sender: Sender<TrayAction>,
     exit_requested: AtomicBool,
+}
+
+#[derive(Clone)]
+pub struct TrayMenu {
+    open: MenuItem,
+    hide: MenuItem,
+    exit: MenuItem,
+}
+
+impl TrayMenu {
+    pub fn set_locale(&self, locale: Locale) {
+        self.open.set_text(locale.text(Text::TrayOpen));
+        self.hide.set_text(locale.text(Text::TrayHide));
+        self.exit.set_text(locale.text(Text::QuitApplication));
+    }
 }
 
 impl PanelControl {
@@ -69,11 +85,19 @@ impl PanelControl {
     }
 }
 
-pub fn create_tray(panel: Arc<PanelControl>) -> Result<TrayIcon, String> {
+pub fn create_tray(
+    panel: Arc<PanelControl>,
+    locale: Locale,
+) -> Result<(TrayIcon, TrayMenu), String> {
     let menu = Menu::new();
-    let open = MenuItem::new("Abrir painel", true, None);
-    let hide = MenuItem::new("Recolher painel", true, None);
-    let exit = MenuItem::new("Encerrar aplicativo", true, None);
+    let open = MenuItem::new(locale.text(Text::TrayOpen), true, None);
+    let hide = MenuItem::new(locale.text(Text::TrayHide), true, None);
+    let exit = MenuItem::new(locale.text(Text::QuitApplication), true, None);
+    let labels = TrayMenu {
+        open: open.clone(),
+        hide: hide.clone(),
+        exit: exit.clone(),
+    };
     menu.append_items(&[&open, &hide, &PredefinedMenuItem::separator(), &exit])
         .map_err(|error| error.to_string())?;
     let (open_id, hide_id, exit_id) = (open.id().clone(), hide.id().clone(), exit.id().clone());
@@ -99,7 +123,7 @@ pub fn create_tray(panel: Arc<PanelControl>) -> Result<TrayIcon, String> {
             panel.show();
         }
     }));
-    TrayIconBuilder::new()
+    let icon = TrayIconBuilder::new()
         .with_id("gamepad-desktop")
         .with_tooltip("Gamepad Desktop")
         .with_title("Gamepad Desktop")
@@ -107,10 +131,16 @@ pub fn create_tray(panel: Arc<PanelControl>) -> Result<TrayIcon, String> {
         .with_menu(Box::new(menu))
         .with_menu_on_left_click(false)
         .build()
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Ok((icon, labels))
 }
 
 fn gamepad_icon() -> Result<Icon, String> {
+    let icon = gamepad_icon_data();
+    Icon::from_rgba(icon.rgba, icon.width, icon.height).map_err(|error| error.to_string())
+}
+
+pub fn gamepad_icon_data() -> IconData {
     let mut rgba = vec![0; 32 * 32 * 4];
     for y in 0..32 {
         for x in 0..32 {
@@ -131,5 +161,9 @@ fn gamepad_icon() -> Result<Icon, String> {
             rgba[(y * 32 + x) * 4..(y * 32 + x + 1) * 4].copy_from_slice(&color);
         }
     }
-    Icon::from_rgba(rgba, 32, 32).map_err(|error| error.to_string())
+    IconData {
+        rgba,
+        width: 32,
+        height: 32,
+    }
 }
