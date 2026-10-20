@@ -10,13 +10,16 @@ use std::{
 use crate::{
     control::{Action, ControlSettings, GamepadFrame, MouseController, NavigationMode, SystemKey},
     gamepads::{GamepadInfo, Gamepads},
+    i18n::Locale,
     item_navigation::ItemNavigator,
     keyboard::{KeyboardSession, KeyboardSettings},
     platform::Platform,
+    preferences::DesktopPreferences,
 };
 
 #[derive(Clone, Default)]
 pub struct RuntimeState {
+    pub locale: Locale,
     pub settings: ControlSettings,
     pub controller: Option<String>,
     pub error: Option<String>,
@@ -27,6 +30,7 @@ pub struct RuntimeState {
     pub keyboard: KeyboardSession,
     pub mode: NavigationMode,
     pub item_status: Option<String>,
+    pub preferences_error: Option<String>,
     pending_mapping: Option<String>,
 }
 
@@ -38,8 +42,13 @@ pub struct DesktopRuntime {
 
 impl Default for DesktopRuntime {
     fn default() -> Self {
-        let mut initial = RuntimeState::default();
-        initial.keyboard.settings = KeyboardSettings::load();
+        let preferences = DesktopPreferences::load();
+        let initial = RuntimeState {
+            locale: preferences.locale,
+            settings: preferences.controls,
+            keyboard: KeyboardSession::with_locale(preferences.locale, KeyboardSettings::load()),
+            ..RuntimeState::default()
+        };
         let state = Arc::new(Mutex::new(initial));
         let stop = Arc::new(AtomicBool::new(false));
         let worker_state = Arc::clone(&state);
@@ -77,6 +86,21 @@ impl DesktopRuntime {
             .settings = settings.normalized();
     }
 
+    pub fn configure_locale(&self, locale: Locale) {
+        let mut state = self.state.lock().expect("runtime state lock");
+        state.locale = locale;
+        state.keyboard.locale = locale;
+    }
+
+    pub fn save_preferences(&self) -> Result<(), String> {
+        let state = self.state.lock().expect("runtime state lock");
+        DesktopPreferences {
+            locale: state.locale,
+            controls: state.settings,
+        }
+        .save()
+    }
+
     pub fn select_controller(&self, selected: Option<u32>) {
         self.state.lock().expect("runtime state lock").selected = selected;
     }
@@ -95,6 +119,7 @@ impl Drop for DesktopRuntime {
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
+        let _ = self.save_preferences();
     }
 }
 
@@ -106,11 +131,20 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
     let mut controller = MouseController::default();
     controller.keyboard.settings = state.lock().expect("runtime state lock").keyboard.settings;
+    controller.keyboard.locale = state.lock().expect("runtime state lock").locale;
     let mut saved_settings = controller.keyboard.settings;
     controller.set_system_keyboard_uses_gamepad(platform.system_keyboard_uses_gamepad());
     controller.keyboard.presentation = platform.keyboard_presentation();
     controller.keyboard.status = platform.keyboard_overlay_error().map(str::to_owned);
     state.lock().expect("runtime state lock").keyboard = controller.keyboard.clone();
+    let mut saved_preferences = {
+        let state = state.lock().expect("runtime state lock");
+        DesktopPreferences {
+            locale: state.locale,
+            controls: state.settings,
+        }
+    };
+    let mut pending_preferences: Option<(DesktopPreferences, Instant)> = None;
     let mut last_tick = Instant::now();
     let outcome = (|| {
         while !stop.load(Ordering::Relaxed) {
@@ -200,6 +234,38 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                 runtime_state.item_status =
                     (controller.mode == NavigationMode::Items).then(|| item_navigation.status());
             }
+            let preferences = {
+                let state = state.lock().expect("runtime state lock");
+                DesktopPreferences {
+                    locale: state.locale,
+                    controls: state.settings,
+                }
+            };
+            if preferences == saved_preferences {
+                pending_preferences = None;
+            } else if pending_preferences
+                .map(|(pending, _)| pending != preferences)
+                .unwrap_or(true)
+            {
+                pending_preferences = Some((preferences, now));
+            }
+            if let Some((pending, changed_at)) = pending_preferences
+                && now.duration_since(changed_at) >= Duration::from_millis(750)
+            {
+                let save_result = pending.save();
+                let mut runtime_state = state.lock().expect("runtime state lock");
+                match save_result {
+                    Ok(()) => {
+                        saved_preferences = pending;
+                        pending_preferences = None;
+                        runtime_state.preferences_error = None;
+                    }
+                    Err(error) => {
+                        runtime_state.preferences_error = Some(error);
+                        pending_preferences = Some((pending, now));
+                    }
+                }
+            }
             if let Err(error) = platform.update_keyboard_overlay(&controller.keyboard) {
                 controller.keyboard.open = false;
                 controller.keyboard.presentation =
@@ -237,6 +303,7 @@ fn update_control(
     elapsed: Duration,
 ) -> Vec<Action> {
     controller.keyboard.settings = state.keyboard.settings;
+    controller.keyboard.locale = state.locale;
     let actions = controller.update(frame, elapsed, &mut state.settings);
     state.mode = controller.mode;
     state.keyboard = controller.keyboard.clone();
