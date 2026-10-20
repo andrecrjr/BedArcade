@@ -1,7 +1,0 @@
-{
-  "extends": "./.wxt/tsconfig.json",
-  "exclude": ["desktop", "node_modules", ".output"],
-  "compilerOptions": {
-    "strict": true
-  }
-}

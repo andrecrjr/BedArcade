@@ -1,4 +1,4 @@
-# Gamepad Navigator Desktop
+# Gamepad Desktop
 
 Use o controle para navegar pelo computador, mover o ponteiro e digitar sem tirar o foco do aplicativo que você está usando.
 
@@ -10,9 +10,9 @@ O app tem três recursos principais: modo mouse, navegação pelos itens que cad
 
 ## Começar
 
-No Windows, baixe e extraia o [pacote x64](dist/GamepadNavigator-Windows-x64.zip), conecte o controle e abra `GamepadNavigator.exe`. O painel mostra quando o controle foi reconhecido e quais comandos estão disponíveis.
+No Windows, baixe e extraia o [pacote x64](dist/GamepadDesktop-Windows-x64.zip), conecte o controle e abra `gamepad-desktop.exe`. O painel mostra quando o controle foi reconhecido e quais comandos estão disponíveis.
 
-No Linux, ainda não há instalador. As instruções para executar o app e as permissões necessárias estão no [guia do sistema](docs/system-overview.md#como-iniciar-no-linux).
+No Linux, baixe e extraia o [pacote x64](dist/GamepadDesktop-Linux-x64.tar.gz). As instruções para executar o app e as permissões necessárias estão no [guia do sistema](docs/system-overview.md#como-iniciar-no-linux).
 
 ## Comandos principais
 
@@ -33,7 +33,7 @@ Os nomes e comandos completos aparecem no painel, incluindo os equivalentes de X
 - A navegação por itens funciona quando o aplicativo publica seus controles para acessibilidade. Quando isso não acontece, use o modo mouse.
 - O teclado visual usa o layout QWERTY em inglês. No Linux, símbolos e acentos podem variar conforme o layout ativo.
 - Em algumas sessões Wayland, incluindo o GNOME Wayland, o teclado visual não está disponível.
-- O pacote Windows existe, mas o uso com controle físico ainda precisa de validação em Windows 11. A compatibilidade em Linux também depende do compositor e das permissões de entrada.
+- Os pacotes Windows e Linux existem, mas o uso com controle físico ainda precisa de validação em Windows 11, Linux/X11 e Wayland.
 
 ## Documentação
 

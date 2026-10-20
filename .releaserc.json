@@ -1,15 +1,22 @@
 {
   "branches": ["main"],
-  "tagFormat": "v${version}",
+  "tagFormat": "desktop-v${version}",
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
-    ["@semantic-release/npm", { "npmPublish": false }],
-    ["@semantic-release/exec", { "prepareCmd": "npm run zip" }],
     [
       "@semantic-release/github",
       {
-        "assets": [{ "path": ".output/*.zip", "label": "BedArcade para Chrome" }],
+        "assets": [
+          {
+            "path": "desktop/dist/GamepadDesktop-Windows-x64.zip",
+            "label": "Gamepad Desktop for Windows x64"
+          },
+          {
+            "path": "desktop/dist/GamepadDesktop-Linux-x64.tar.gz",
+            "label": "Gamepad Desktop for Linux x64"
+          }
+        ],
         "successComment": false,
         "failComment": false,
         "failTitle": false,

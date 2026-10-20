@@ -21,14 +21,14 @@ mod windows_keyboard_overlay;
 
 type SharedDesktop = Arc<Mutex<DesktopRuntime>>;
 
-struct GamepadNavigatorApp {
+struct GamepadDesktopApp {
     desktop: SharedDesktop,
     panel: Arc<PanelControl>,
     tray_error: Option<String>,
     mapping_text: String,
 }
 
-impl GamepadNavigatorApp {
+impl GamepadDesktopApp {
     fn new(desktop: SharedDesktop, panel: Arc<PanelControl>, tray_error: Option<String>) -> Self {
         Self {
             desktop,
@@ -39,7 +39,7 @@ impl GamepadNavigatorApp {
     }
 }
 
-impl eframe::App for GamepadNavigatorApp {
+impl eframe::App for GamepadDesktopApp {
     fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
         [0.0; 4]
     }
@@ -215,7 +215,7 @@ fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession, immediate
         .input(|input| input.viewport().monitor_size)
         .unwrap_or(egui::vec2(1920.0, 1080.0));
     let (width, height) = session.settings.surface_size();
-    let viewport = egui::ViewportId::from_hash_of("gamepad-navigator-keyboard");
+    let viewport = egui::ViewportId::from_hash_of("gamepad-desktop-keyboard");
     let pixels_per_point = ui
         .ctx()
         .input(|i| {
@@ -274,7 +274,7 @@ fn keyboard_viewport_builder(
     windows: bool,
 ) -> egui::ViewportBuilder {
     let builder = egui::ViewportBuilder::default()
-        .with_title("Gamepad Navigator · Teclado")
+        .with_title("Gamepad Desktop · Teclado")
         .with_inner_size(size)
         .with_position(position)
         .with_resizable(false)
@@ -297,7 +297,7 @@ fn keyboard_viewport_builder(
 
 fn main_viewport_builder(windows: bool) -> egui::ViewportBuilder {
     egui::ViewportBuilder::default()
-        .with_title("Gamepad Navigator")
+        .with_title("Gamepad Desktop")
         .with_inner_size([860.0, 760.0])
         .with_min_inner_size([660.0, 500.0])
         // eframe shares the root GL config with child viewports.
@@ -411,7 +411,7 @@ fn acquire_instance_lock() -> std::io::Result<Option<std::fs::File>> {
             std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
         })
         .ok_or_else(|| std::io::Error::other("XDG_RUNTIME_DIR and HOME are unavailable"))?
-        .join("gamepad-navigator");
+        .join("gamepad-desktop");
     std::fs::create_dir_all(&directory)?;
     let lock = std::fs::OpenOptions::new()
         .create(true)
@@ -450,12 +450,12 @@ fn main() -> eframe::Result {
         let app_panel = Arc::clone(&panel);
         let app_error = tray_error.clone();
         eframe::run_native(
-            "Gamepad Navigator",
+            "Gamepad Desktop",
             options,
             Box::new(move |creation_context| {
                 creation_context.egui_ctx.set_visuals(egui::Visuals::dark());
                 app_panel.attach(Some(creation_context.egui_ctx.clone()));
-                Ok(Box::new(GamepadNavigatorApp::new(
+                Ok(Box::new(GamepadDesktopApp::new(
                     app_desktop,
                     app_panel,
                     app_error,

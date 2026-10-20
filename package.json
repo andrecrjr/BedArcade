@@ -1,29 +1,13 @@
 {
-  "name": "bedarcade",
+  "name": "gamepad-desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wxt",
-    "build": "wxt build",
-    "build:e2e": "wxt build --mode e2e",
-    "zip": "wxt zip",
-    "typecheck": "tsc --noEmit",
-    "lint": "oxlint --deny-warnings",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "release": "semantic-release",
-    "test:e2e": "npm run build:e2e && playwright test",
-    "postinstall": "wxt prepare"
+    "release": "semantic-release"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
-    "@semantic-release/exec": "^7.1.0",
-    "@types/chrome": "^0.3.5",
-    "oxfmt": "^0.73.0",
-    "oxlint": "^1.88.0",
-    "semantic-release": "^25.0.9",
-    "typescript": "^5.7.3",
-    "wxt": "^0.20.0"
+    "@semantic-release/github": "^12.0.10",
+    "semantic-release": "^25.0.9"
   }
 }

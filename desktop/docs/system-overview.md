@@ -1,10 +1,10 @@
-# Como o Gamepad Navigator Desktop funciona
+# Como o Gamepad Desktop funciona
 
-O Gamepad Navigator Desktop permite controlar a janela ativa com um gamepad. Ele é um aplicativo independente da extensão de navegador: trabalha no desktop e pode ser usado com navegadores e outros programas, conforme o suporte de cada um.
+O Gamepad Desktop permite controlar a janela ativa com um gamepad. Ele é um aplicativo independente da extensão de navegador: trabalha no desktop e pode ser usado com navegadores e outros programas, conforme o suporte de cada um.
 
 ## A experiência em poucas palavras
 
-1. Conecte um controle e abra o painel do Gamepad Navigator.
+1. Conecte um controle e abra o painel do Gamepad Desktop.
 2. Use o modo mouse para apontar e clicar, ou alterne para navegar pelos itens acessíveis da janela.
 3. Abra o teclado visual quando precisar digitar. Ele envia as teclas ao aplicativo que já estava ativo.
 4. Recolha o painel para a bandeja para continuar usando o controle em segundo plano.
@@ -115,7 +115,7 @@ Fechar ou recolher o painel mantém o controle funcionando na bandeja, perto do 
 
 ### Windows
 
-O modo itens usa a árvore UI Automation da janela focada. A cobertura depende do que o programa publica. O Windows pode bloquear entrada enviada a aplicativos executados com privilégios mais altos que o Gamepad Navigator.
+O modo itens usa a árvore UI Automation da janela focada. A cobertura depende do que o programa publica. O Windows pode bloquear entrada enviada a aplicativos executados com privilégios mais altos que o Gamepad Desktop.
 
 ### Linux
 
@@ -153,7 +153,7 @@ Os arquivos PPM gerados vão para `/tmp/gamepad-keyboard-preview`.
 - Ainda não há uma matriz publicada de compatibilidade por aplicativo. A disponibilidade de foco, itens, ações e coordenadas depende de cada programa.
 - O teclado tem desenho QWERTY ANSI. No Linux, layouts diferentes podem produzir símbolos diferentes e o suporte a caracteres acentuados ainda precisa ser validado.
 - O teclado visual em Wayland não está disponível em compositores sem `wlr-layer-shell`.
-- O pacote Windows x64 pode ser encontrado em [dist/GamepadNavigator-Windows-x64.zip](../dist/GamepadNavigator-Windows-x64.zip). O build não substitui a validação com controle físico no Windows.
+- Os pacotes Windows e Linux x64 são anexados às releases do Gamepad Desktop. O build não substitui a validação com controle físico em cada sistema.
 - A pesquisa e as decisões do teclado estão em [keyboard-research.md](keyboard-research.md); o que falta concluir está em [roadmap.md](roadmap.md).
 
 ## Mapa interno

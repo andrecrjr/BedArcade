@@ -13,7 +13,7 @@ use windows::{
     core::BOOL,
 };
 
-const KEYBOARD_TITLE: &str = "Gamepad Navigator · Teclado";
+const KEYBOARD_TITLE: &str = "Gamepad Desktop · Teclado";
 static CLICK_THROUGH_APPLIED: AtomicBool = AtomicBool::new(false);
 
 pub fn enable_click_through() {

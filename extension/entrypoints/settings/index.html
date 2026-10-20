@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en" data-i18n-page-title="settingsTitle">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080e18" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <title>Controller settings · Gamepad Desktop</title>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <a
+          class="brand brand-link"
+          href="/newtab.html"
+          aria-label="Back to launcher"
+          data-i18n-aria-label="backToLauncher"
+        >
+          <img class="brand-mark" src="/icons/icon-128.png" alt="" aria-hidden="true" />
+          <span class="brand-name">BED<strong>ARCADE</strong></span>
+        </a>
+        <div class="topbar-actions">
+          <label class="language-control">
+            <span data-i18n="language">Language</span>
+            <select id="language-select" data-i18n-aria-label="language">
+              <option value="en">English</option>
+              <option value="pt-BR">Português (Brasil)</option>
+              <option value="es">Español</option>
+            </select>
+          </label>
+          <a class="settings-link" href="/newtab.html" data-i18n="backToLauncher">
+            Back to launcher
+          </a>
+        </div>
+      </header>
+
+      <main>
+        <section class="home-panel settings-panel" aria-labelledby="settings-title">
+          <p class="eyebrow" data-i18n="settingsEyebrow">PLAYER PREFERENCES · CONTROLS</p>
+          <h1 id="settings-title">
+            <span class="title-lead" data-i18n="settingsHeadingLead">Controller</span>
+            <span data-i18n="settingsHeadingAccent">hotkeys</span>
+          </h1>
+          <p class="settings-copy" data-i18n="settingsCopy">
+            Choose the controller buttons for each action. Changes apply to open pages.
+          </p>
+
+          <form id="settings-form">
+            <section class="binding-group" aria-labelledby="movement-title">
+              <h2 id="movement-title" data-i18n="focusMovement">Focus movement</h2>
+              <div class="bindings-grid">
+                <label class="binding-row" for="binding-moveUp">
+                  <span data-i18n="moveUp">Move up</span>
+                  <select id="binding-moveUp" data-binding="moveUp"></select>
+                </label>
+                <label class="binding-row" for="binding-moveDown">
+                  <span data-i18n="moveDown">Move down</span>
+                  <select id="binding-moveDown" data-binding="moveDown"></select>
+                </label>
+                <label class="binding-row" for="binding-moveLeft">
+                  <span data-i18n="moveLeft">Move left</span>
+                  <select id="binding-moveLeft" data-binding="moveLeft"></select>
+                </label>
+                <label class="binding-row" for="binding-moveRight">
+                  <span data-i18n="moveRight">Move right</span>
+                  <select id="binding-moveRight" data-binding="moveRight"></select>
+                </label>
+              </div>
+            </section>
+
+            <section class="binding-group" aria-labelledby="actions-title">
+              <h2 id="actions-title" data-i18n="actions">Actions</h2>
+              <div class="bindings-grid">
+                <label class="binding-row" for="binding-activate">
+                  <span data-i18n="activate">Activate</span>
+                  <select id="binding-activate" data-binding="activate"></select>
+                </label>
+                <label class="binding-row" for="binding-back">
+                  <span data-i18n="back">Back</span>
+                  <select id="binding-back" data-binding="back"></select>
+                </label>
+                <label class="binding-row" for="binding-previousTab">
+                  <span data-i18n="previousTab">Previous tab</span>
+                  <select id="binding-previousTab" data-binding="previousTab"></select>
+                </label>
+                <label class="binding-row" for="binding-nextTab">
+                  <span data-i18n="nextTab">Next tab</span>
+                  <select id="binding-nextTab" data-binding="nextTab"></select>
+                </label>
+                <label class="binding-row" for="binding-newTab">
+                  <span data-i18n="openNewTab">Open new tab</span>
+                  <select id="binding-newTab" data-binding="newTab"></select>
+                </label>
+                <div class="binding-row binding-fixed">
+                  <span data-i18n="pauseResume">Pause / resume</span>
+                  <span class="binding-fixed-prompt" data-fixed-prompt="8"></span>
+                </div>
+                <div class="binding-row binding-fixed">
+                  <span data-i18n="hintSubmit">Submit form</span>
+                  <span class="binding-fixed-prompt" data-fixed-prompt="9"></span>
+                </div>
+                <div class="binding-row refresh-binding">
+                  <span data-i18n="refreshPage">Refresh current page</span>
+                  <div class="chord-selects">
+                    <label class="visually-hidden" for="binding-refresh-modifier">
+                      <span data-i18n="refreshModifierLabel">Refresh modifier button</span>
+                    </label>
+                    <select id="binding-refresh-modifier" data-binding="refreshModifier"></select>
+                    <span aria-hidden="true">+</span>
+                    <label class="visually-hidden" for="binding-refresh-trigger">
+                      <span data-i18n="refreshTriggerLabel">Refresh trigger button</span>
+                    </label>
+                    <select id="binding-refresh-trigger" data-binding="refreshTrigger"></select>
+                  </div>
+                </div>
+              </div>
+              <p class="group-note" data-i18n="refreshChordNote">
+                Refresh uses a two-button combination.
+              </p>
+            </section>
+
+            <section class="analog-note" aria-labelledby="analog-title">
+              <h2 id="analog-title" data-i18n="analogControls">Analog controls</h2>
+              <p data-i18n="analogControlsCopy">
+                Left stick moves focus. The right stick scrolls the page.
+              </p>
+            </section>
+
+            <div class="settings-actions">
+              <button id="restore-defaults" class="quiet-button" type="button">
+                <span data-i18n="restoreDefaults">Restore defaults</span>
+              </button>
+              <button class="pin-button" type="submit" data-i18n="saveControls">
+                Save controls
+              </button>
+            </div>
+            <p
+              id="settings-feedback"
+              class="settings-feedback"
+              role="status"
+              aria-live="polite"
+            ></p>
+          </form>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

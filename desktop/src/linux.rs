@@ -36,12 +36,12 @@ impl Platform {
                 .map(KeyCode)
                 .collect();
             let pointer = VirtualDevice::builder()?
-                .name("Gamepad Navigator Mouse")
+                .name("Gamepad Desktop Mouse")
                 .with_keys(&mouse_keys)?
                 .with_relative_axes(&relative)?
                 .build()?;
             let keyboard = VirtualDevice::builder()?
-                .name("Gamepad Navigator Keyboard")
+                .name("Gamepad Desktop Keyboard")
                 .with_keys(&keys)?
                 .build()?;
             let is_wayland = env::var_os("WAYLAND_DISPLAY").is_some()

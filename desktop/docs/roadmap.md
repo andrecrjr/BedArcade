@@ -66,7 +66,7 @@ As etapas completas abaixo só terminam quando seus critérios de validação fo
 - [ ] Permitir escolher controle, ver conexão e editar mapeamentos sem usar teclado ou mouse.
 - [ ] Adicionar pausa/retomada e uma ação de saída sempre acessível pelo controle.
 
-**Pronto quando:** é possível abrir e operar todas as telas do próprio Gamepad Navigator só pelo gamepad, incluindo reconexão.
+**Pronto quando:** é possível abrir e operar todas as telas do próprio Gamepad Desktop só pelo gamepad, incluindo reconexão.
 
 ### 3. Criar os adaptadores nativos de cada sistema
 

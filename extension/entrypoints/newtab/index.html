@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en" data-i18n-page-title="newTabTitle">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080e18" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
+    <title>Gamepad Desktop</title>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Gamepad Desktop">
+          <img class="brand-mark" src="/icons/icon-128.png" alt="" aria-hidden="true" />
+          <span class="brand-name">BED<strong>ARCADE</strong></span>
+        </div>
+        <div class="topbar-actions">
+          <label class="language-control">
+            <span data-i18n="language">Language</span>
+            <select id="language-select" data-i18n-aria-label="language">
+              <option value="en">English</option>
+              <option value="pt-BR">Português (Brasil)</option>
+              <option value="es">Español</option>
+            </select>
+          </label>
+          <button id="help-link" class="settings-link" type="button" data-i18n="howToUse">
+            How to use
+          </button>
+          <a
+            id="settings-link"
+            class="settings-link"
+            href="/settings.html"
+            data-i18n="controllerSettings"
+            >Controller settings</a
+          >
+          <div id="controller-status" class="controller-status" role="status" aria-live="polite">
+            <span data-i18n="controllerConnect">Press any controller button to connect</span>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section id="home-panel" class="home-panel" aria-labelledby="welcome-title">
+          <div class="welcome">
+            <p class="eyebrow" data-i18n="homeEyebrow">BROWSER ARCADE · GAMEPAD NAVIGATION</p>
+            <h1 id="welcome-title">
+              <span class="title-lead" data-i18n="homeTitleLead">Your browser</span>
+              <span data-i18n="homeTitleAccent">arcade.</span>
+            </h1>
+            <p class="welcome-copy" data-i18n="homeCopy">
+              Open a favorite game site or enter any web address.
+            </p>
+          </div>
+
+          <form id="site-form" novalidate>
+            <div class="address-controls">
+              <label for="site-url" data-i18n="addressLabel">Website address</label>
+              <div class="address-row">
+                <input
+                  id="site-url"
+                  name="url"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="url"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="example.com"
+                  data-i18n-placeholder="addressPlaceholder"
+                  aria-describedby="feedback"
+                />
+                <button class="open-button" type="submit">
+                  <span data-i18n="launch">Launch</span> <kbd>A</kbd>
+                </button>
+              </div>
+            </div>
+
+            <section
+              id="tv-mode-settings"
+              class="tv-mode-settings"
+              data-i18n-aria-label="tvSettingsLabel"
+              aria-label="TV mode settings"
+              hidden
+            >
+              <div class="tv-mode-row">
+                <label class="tv-mode-toggle" for="tv-mode-enabled">
+                  <input id="tv-mode-enabled" type="checkbox" disabled />
+                  <span data-i18n="tvModeToggle">Open this site in TV mode</span>
+                </label>
+                <p id="tv-mode-hint" class="tv-mode-hint"></p>
+              </div>
+              <div id="tv-url-field" class="tv-url-field" hidden>
+                <label for="tv-url" data-i18n="tvUrlLabel">TV landing URL</label>
+                <input
+                  id="tv-url"
+                  name="tv-url"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="url"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  placeholder="Blank uses the Android TV profile"
+                  data-i18n-placeholder="tvUrlPlaceholder"
+                  aria-describedby="tv-url-help"
+                />
+                <p id="tv-url-help" class="tv-url-help">
+                  <span data-i18n="tvUrlHelp">
+                    Use a URL on this site. YouTube uses its built-in /tv route.
+                  </span>
+                </p>
+              </div>
+            </section>
+
+            <div class="pin-form-row">
+              <label class="visually-hidden" for="site-label" data-i18n="shortcutNameLabel"
+                >Shortcut name (optional)</label
+              >
+              <input
+                id="site-label"
+                name="label"
+                type="text"
+                autocomplete="off"
+                placeholder="Shortcut name (optional)"
+                data-i18n-placeholder="shortcutNamePlaceholder"
+              />
+              <button id="save-pin" class="pin-button" type="button" data-i18n="addShortcut">
+                Add shortcut
+              </button>
+            </div>
+            <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+          </form>
+
+          <section class="shortcut-section" aria-labelledby="shortcuts-title">
+            <div class="section-heading">
+              <div>
+                <p class="section-kicker" data-i18n="shortcutKicker">YOUR LIBRARY</p>
+                <h2 id="shortcuts-title" data-i18n="shortcutTitle">Quick launch</h2>
+                <p data-i18n="shortcutCopy">Pick a favorite and jump back in.</p>
+              </div>
+              <button id="edit-pins" class="quiet-button" type="button" data-i18n="edit">
+                Edit
+              </button>
+            </div>
+            <div
+              id="pin-grid"
+              class="pin-grid"
+              role="group"
+              aria-label="Pinned websites"
+              data-i18n-aria-label="pinnedWebsites"
+            ></div>
+          </section>
+        </section>
+        <section
+          id="onboarding-panel"
+          class="onboarding-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="onboarding-title"
+          hidden
+        >
+          <div class="onboarding-content">
+            <p class="eyebrow" data-i18n="onboardingEyebrow">PLAYER ONE · READY</p>
+            <h2 id="onboarding-title" data-i18n="onboardingTitle">Welcome to Gamepad Desktop</h2>
+            <p class="onboarding-intro" data-i18n="onboardingIntro">
+              Your browser arcade, ready to play from bed.
+            </p>
+            <div class="onboarding-cards">
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🎮</span>
+                <h3 data-i18n="onboardingConnectTitle">1. Connect your controller</h3>
+                <p data-i18n="onboardingConnectCopy">
+                  Connect a USB or Bluetooth controller, then press any button. You can also
+                  continue with your keyboard or mouse.
+                </p>
+              </article>
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🕹️</span>
+                <h3 data-i18n="onboardingControlsTitle">2. All controller commands</h3>
+                <p id="onboarding-controls-copy" data-i18n="onboardingControlsCopy">
+                  Prompts use your controller’s icons when recognized. If it can’t be identified,
+                  choose Xbox or PlayStation below. Only reload uses two buttons together.
+                </p>
+                <div id="controller-icon-choice" class="onboarding-icon-choice" hidden>
+                  <p data-i18n="controllerIconChoiceHelp">
+                    Automatic detection could not identify your controller. Choose the labels that
+                    match its buttons.
+                  </p>
+                  <label for="controller-icon-style">
+                    <span data-i18n="controllerIconChoiceLabel">Controller button labels</span>
+                    <select id="controller-icon-style">
+                      <option value="auto" data-i18n="controllerIconStyleAuto">
+                        Detect automatically
+                      </option>
+                      <option value="xbox">Xbox</option>
+                      <option value="playstation">PlayStation</option>
+                    </select>
+                  </label>
+                </div>
+                <ul
+                  id="onboarding-commands"
+                  class="onboarding-command-list"
+                  aria-label="Controller controls"
+                  data-i18n-aria-label="controllerHints"
+                ></ul>
+              </article>
+              <article data-onboarding-card>
+                <span class="onboarding-icon" aria-hidden="true">🚀</span>
+                <h3 data-i18n="onboardingLauncherTitle">3. Launch a site</h3>
+                <p data-i18n="onboardingLauncherCopy">
+                  Choose a favorite or enter a web address. Focus a text field to open the floating
+                  keyboard.
+                </p>
+              </article>
+            </div>
+            <div class="onboarding-actions">
+              <button
+                id="onboarding-skip"
+                class="quiet-button"
+                type="button"
+                data-i18n="onboardingSkip"
+              >
+                Skip tutorial
+              </button>
+              <button
+                id="onboarding-start"
+                class="pin-button"
+                type="button"
+                data-i18n="onboardingStart"
+              >
+                Start browsing
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div id="controller-hints" class="controller-hints" aria-label="Controller controls"></div>
+      </footer>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

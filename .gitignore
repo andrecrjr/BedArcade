@@ -3,3 +3,5 @@ node_modules/
 .wxt/
 playwright-report/
 test-results/
+desktop/target/
+desktop/dist/

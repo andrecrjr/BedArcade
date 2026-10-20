@@ -59,7 +59,7 @@ impl WaylandKeyboardOverlay {
             &handle,
             surface,
             Layer::Overlay,
-            Some("gamepad-navigator-keyboard"),
+            Some("gamepad-desktop-keyboard"),
             None,
         );
         let (surface_width, surface_height) = KeyboardSettings::default().surface_size();
@@ -219,7 +219,7 @@ impl WaylandKeyboardOverlay {
                 &self.queue.handle(),
                 self.compositor.create_surface(&self.queue.handle()),
                 Layer::Overlay,
-                Some("gamepad-navigator-keyboard"),
+                Some("gamepad-desktop-keyboard"),
                 Some(output),
             );
             layer.set_keyboard_interactivity(KeyboardInteractivity::None);

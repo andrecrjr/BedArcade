@@ -100,9 +100,9 @@ pub fn create_tray(panel: Arc<PanelControl>) -> Result<TrayIcon, String> {
         }
     }));
     TrayIconBuilder::new()
-        .with_id("gamepad-navigator")
-        .with_tooltip("Gamepad Navigator")
-        .with_title("Gamepad Navigator")
+        .with_id("gamepad-desktop")
+        .with_tooltip("Gamepad Desktop")
+        .with_title("Gamepad Desktop")
         .with_icon(gamepad_icon()?)
         .with_menu(Box::new(menu))
         .with_menu_on_left_click(false)

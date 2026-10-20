@@ -2,31 +2,34 @@
 
 ## Project Structure and Module Organization
 
-- `entrypoints/content.ts` runs the gamepad loop in supported web pages, manages the focus outline, and activates selected controls.
-- `entrypoints/background.ts` handles browser tab actions such as back, next tab, and previous tab.
-- `lib/spatial.ts` finds visible, enabled candidates and chooses the nearest target by direction.
-- `lib/gamepad.ts` reads real browser gamepad state in production and provides controlled input frames to E2E builds.
-- `tests/e2e/` contains Playwright tests against local pages loaded with the WXT extension.
-- `wxt.config.ts` defines the extension manifest; `tsconfig.json` enables strict TypeScript checking.
-- `README.md` documents setup and manual use. WXT generates the unpacked extension under `.output/chrome-mv3`.
+- `desktop/` contains the Rust desktop app, tests, and platform documentation.
+- `extension/entrypoints/content.ts` runs the browser extension gamepad loop, manages focus, and activates selected controls.
+- `extension/entrypoints/background.ts` handles browser tab actions such as back, next tab, and previous tab.
+- `extension/lib/spatial.ts` finds visible, enabled candidates and chooses the nearest target by direction.
+- `extension/lib/gamepad.ts` reads real browser gamepad state and provides controlled input frames to E2E builds.
+- `extension/tests/e2e/` contains Playwright tests against local pages loaded with WXT.
+- `extension/wxt.config.ts` defines the extension manifest; `extension/tsconfig.json` enables strict TypeScript checking.
+- `extension/README.md` documents the browser extension. WXT generates the unpacked extension under `extension/.output/chrome-mv3`.
+- Root `package.json` and `.releaserc.json` configure semantic-release for the desktop app.
 
 ## Build, Test, and Development Commands
 
-- `npm install` installs the project dependencies.
-- `npm run dev` starts WXT development mode.
-- `npm run typecheck` runs TypeScript without emitting files.
-- `npm run lint` runs Oxlint; `npm run format` formats project files with Oxfmt, and `npm run format:check` checks formatting without edits.
-- `npm run build` creates a production extension build.
-- `npm run test:e2e` builds the WXT `e2e` mode and runs Playwright against Chromium; run `npx playwright install chromium` once to install its browser.
-- `npm run zip` packages the build for distribution.
+- `make web-install` installs the extension dependencies.
+- `make web-dev` starts WXT development mode.
+- `make web-typecheck` runs TypeScript without emitting files.
+- `make web-lint`, `make web-format`, and `make web-format-check` run Oxlint and Oxfmt.
+- `make web-build` creates a production extension build; `make web-package` creates its ZIP.
+- `make web-test` builds the WXT `e2e` mode and runs Playwright against Chromium; run `npx playwright install chromium` from `extension/` once to install its browser.
+- `make desktop-run`, `make desktop-check`, `make desktop-lint`, `make desktop-format`, and `make desktop-test` run the Rust app workflows.
+- `make desktop-linux-package` and `make desktop-windows` create platform release packages.
 
 ## Coding Style and Naming Conventions
 
-Use strict TypeScript and preserve the existing two-space indentation, single quotes, and semicolons. Prefer explicit types at browser API and message boundaries. Use `camelCase` for variables and functions; keep module filenames lowercase. No formatter or linter is configured, so keep changes consistent with nearby code and run `npm run typecheck`.
+Use strict TypeScript and preserve the existing two-space indentation, single quotes, and semicolons in `extension/`. Prefer explicit types at browser API and message boundaries. Use `camelCase` for variables and functions; keep module filenames lowercase. Run the configured Oxfmt and Oxlint commands for finished changes.
 
 ## Testing Guidelines
 
-Before submitting, run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test:e2e`, and `npm run build`. E2E tests use deterministic standard-mapped input frames and verify focus movement, activation, pause/resume, browser history, and tab switching. Also use the manual gamepad walkthrough in `README.md` when validating physical controllers; automated coverage currently targets Chromium and standard mappings. No coverage threshold is configured.
+Before submitting, run the relevant extension format, lint, typecheck, and build commands, plus the desktop format, lint, check, and test commands. E2E tests use deterministic standard-mapped input frames and verify focus movement, activation, pause/resume, browser history, and tab switching. Physical controller behavior still needs manual validation; automated extension coverage targets Chromium and standard mappings.
 
 ## Commits and Pull Requests
 
