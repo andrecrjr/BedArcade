@@ -2,10 +2,14 @@
 
 NPM ?= npm
 CARGO ?= cargo
+ZIP ?= zip
 DESKTOP_MANIFEST := desktop/Cargo.toml
 LINUX_TARGET ?= x86_64-unknown-linux-gnu
 WINDOWS_TARGET ?= x86_64-pc-windows-gnu
 MINGW_BIN ?= $(firstword $(wildcard $(HOME)/.local/share/gamepad-navigator/toolchains/mingw/usr/bin))
+WINDOWS_DIST_DIR := desktop/dist
+WINDOWS_BINARY := desktop/target/$(WINDOWS_TARGET)/release/gamepad-desktop.exe
+WINDOWS_PACKAGE := $(WINDOWS_DIST_DIR)/GamepadNavigator-Windows-x64.zip
 
 .PHONY: help dev run build check lint format format-check test \
 	web-install web-dev web-build web-package web-typecheck web-lint web-format web-format-check web-test \
@@ -29,7 +33,7 @@ help:
 		'Extension: web-install, web-dev, web-build, web-package, web-typecheck, web-lint, web-format, web-format-check, web-test' \
 		'Desktop:   desktop-run, desktop-build, desktop-release, desktop-linux, desktop-windows, desktop-check, desktop-lint, desktop-format, desktop-format-check, desktop-test, desktop-preview' \
 		'' \
-		'desktop-windows cross-compiles x86_64-pc-windows-gnu; install that Rust target and MinGW/CMake first.'
+		'desktop-windows builds and packages x64 Windows; install the Rust target, MinGW, CMake, and zip first.'
 
 dev: web-dev
 
@@ -88,6 +92,9 @@ desktop-linux:
 
 desktop-windows:
 	PATH="$(if $(MINGW_BIN),$(MINGW_BIN):)$$PATH" $(CARGO) build --manifest-path $(DESKTOP_MANIFEST) --release --target $(WINDOWS_TARGET)
+	mkdir -p $(WINDOWS_DIST_DIR)
+	cp $(WINDOWS_BINARY) $(WINDOWS_DIST_DIR)/GamepadNavigator.exe
+	$(ZIP) -q -j -FS $(WINDOWS_PACKAGE) $(WINDOWS_DIST_DIR)/GamepadNavigator.exe
 
 desktop-check:
 	$(CARGO) check --manifest-path $(DESKTOP_MANIFEST)

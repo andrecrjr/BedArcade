@@ -16,6 +16,8 @@ use std::{
 };
 
 mod keyboard_view;
+#[cfg(target_os = "windows")]
+mod windows_keyboard_overlay;
 
 type SharedDesktop = Arc<Mutex<DesktopRuntime>>;
 
@@ -52,7 +54,7 @@ impl eframe::App for GamepadNavigatorApp {
             .state()
             .keyboard;
         if keyboard.presentation == KeyboardPresentation::Viewport {
-            show_keyboard_viewport(ui, keyboard);
+            show_keyboard_viewport(ui, keyboard, cfg!(target_os = "windows"));
         }
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
@@ -207,7 +209,7 @@ fn handle_panel_close(context: &egui::Context, panel: &PanelControl, tray_availa
     }
 }
 
-fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession) {
+fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession, immediate: bool) {
     let screen = ui
         .ctx()
         .input(|input| input.viewport().monitor_size)
@@ -250,19 +252,28 @@ fn show_keyboard_viewport(ui: &mut egui::Ui, session: KeyboardSession) {
     );
     let size = egui::vec2(rect.width as f32 / factor, rect.height as f32 / factor);
     let position = egui::pos2(rect.x as f32 / factor, rect.y as f32 / factor);
-    ui.ctx().show_viewport_deferred(
-        viewport,
-        keyboard_viewport_builder(size, position, session.open),
-        move |ui, _| keyboard_viewport_ui(ui, &session),
-    );
+    let builder =
+        keyboard_viewport_builder(size, position, session.open, cfg!(target_os = "windows"));
+    if immediate {
+        ui.ctx()
+            .show_viewport_immediate(viewport, builder, move |ui, _| {
+                keyboard_viewport_ui(ui, &session)
+            });
+    } else {
+        ui.ctx()
+            .show_viewport_deferred(viewport, builder, move |ui, _| {
+                keyboard_viewport_ui(ui, &session)
+            });
+    }
 }
 
 fn keyboard_viewport_builder(
     size: egui::Vec2,
     position: egui::Pos2,
     open: bool,
+    windows: bool,
 ) -> egui::ViewportBuilder {
-    egui::ViewportBuilder::default()
+    let builder = egui::ViewportBuilder::default()
         .with_title("Gamepad Navigator · Teclado")
         .with_inner_size(size)
         .with_position(position)
@@ -271,18 +282,93 @@ fn keyboard_viewport_builder(
         .with_transparent(true)
         .with_active(false)
         .with_always_on_top()
-        .with_mouse_passthrough(true)
         .with_taskbar(false)
         .with_has_shadow(false)
-        .with_visible(open)
+        .with_visible(open);
+    if windows {
+        // winit sets WS_EX_LAYERED for mouse passthrough on Windows, hiding
+        // transparent overlay content. The Windows helper applies click-through
+        // without that style after the viewport exists.
+        builder
+    } else {
+        builder.with_mouse_passthrough(true)
+    }
+}
+
+fn main_viewport_builder(windows: bool) -> egui::ViewportBuilder {
+    egui::ViewportBuilder::default()
+        .with_title("Gamepad Navigator")
+        .with_inner_size([860.0, 760.0])
+        .with_min_inner_size([660.0, 500.0])
+        // eframe shares the root GL config with child viewports.
+        .with_transparent(windows)
 }
 
 #[cfg(test)]
 mod overlay_tests {
     use super::*;
+
+    #[test]
+    fn windows_keyboard_viewport_renders_during_the_parent_pass() {
+        let context = egui::Context::default();
+        context.set_embed_viewports(false);
+        let rendered_immediately = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let rendered = Arc::clone(&rendered_immediately);
+        egui::Context::set_immediate_viewport_renderer(move |context, mut viewport| {
+            rendered.store(true, std::sync::atomic::Ordering::Relaxed);
+            let mut input = egui::RawInput {
+                viewport_id: viewport.ids.this,
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(720.0, 258.0),
+                )),
+                ..Default::default()
+            };
+            input.viewports.insert(
+                viewport.ids.this,
+                egui::ViewportInfo {
+                    parent: Some(viewport.ids.parent),
+                    ..Default::default()
+                },
+            );
+            let mut output = context.run_ui(input, |ui| (viewport.viewport_ui_cb)(ui));
+            output.textures_delta.clear();
+        });
+        let mut session = KeyboardSession::default();
+        session.open = true;
+
+        let mut output = context.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(720.0, 258.0),
+                )),
+                ..Default::default()
+            },
+            |ui| show_keyboard_viewport(ui, session.clone(), true),
+        );
+        output.textures_delta.clear();
+
+        assert!(rendered_immediately.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    #[test]
+    fn windows_root_viewport_requests_transparency_for_keyboard_overlay() {
+        assert_eq!(main_viewport_builder(true).transparent, Some(true));
+        assert_eq!(main_viewport_builder(false).transparent, Some(false));
+    }
+
+    #[test]
+    fn windows_keyboard_viewport_avoids_winit_mouse_passthrough() {
+        let builder =
+            keyboard_viewport_builder(egui::vec2(640.0, 229.0), egui::Pos2::ZERO, true, true);
+        assert_eq!(builder.mouse_passthrough, None);
+    }
+
     #[test]
     fn closed_keyboard_has_no_visible_window_or_native_shadow() {
-        let builder = keyboard_viewport_builder(egui::vec2(640.0, 229.0), egui::Pos2::ZERO, false);
+        let builder =
+            keyboard_viewport_builder(egui::vec2(640.0, 229.0), egui::Pos2::ZERO, false, false);
         assert_eq!(builder.visible, Some(false));
         assert_eq!(builder.has_shadow, Some(false));
         assert_eq!(builder.transparent, Some(true));
@@ -291,6 +377,10 @@ mod overlay_tests {
 }
 
 fn keyboard_viewport_ui(ui: &mut egui::Ui, session: &KeyboardSession) {
+    #[cfg(target_os = "windows")]
+    if session.open {
+        windows_keyboard_overlay::enable_click_through();
+    }
     ui.ctx().request_repaint_after(Duration::from_millis(50));
     keyboard_view::show(ui, session);
 }
@@ -313,7 +403,37 @@ fn shortcut_guide(ui: &mut egui::Ui, shortcuts: &[(&str, &str)]) {
         });
 }
 
+#[cfg(target_os = "linux")]
+fn acquire_instance_lock() -> std::io::Result<Option<std::fs::File>> {
+    let directory = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+        })
+        .ok_or_else(|| std::io::Error::other("XDG_RUNTIME_DIR and HOME are unavailable"))?
+        .join("gamepad-navigator");
+    std::fs::create_dir_all(&directory)?;
+    let lock = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(directory.join("desktop.lock"))?;
+    match lock.try_lock() {
+        Ok(()) => Ok(Some(lock)),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+        Err(std::fs::TryLockError::Error(error)) => Err(error),
+    }
+}
+
 fn main() -> eframe::Result {
+    #[cfg(target_os = "linux")]
+    let _instance_lock = match acquire_instance_lock() {
+        Ok(Some(lock)) => lock,
+        Ok(None) => return Ok(()),
+        Err(error) => return Err(eframe::Error::AppCreation(Box::new(error))),
+    };
+
     // The service belongs to the process, so closing a Wayland window keeps it alive.
     let desktop = Arc::new(Mutex::new(DesktopRuntime::default()));
     let (panel, actions) = PanelControl::new();
@@ -321,10 +441,7 @@ fn main() -> eframe::Result {
     let tray_error = tray.as_ref().err().cloned();
     loop {
         let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_title("Gamepad Navigator")
-                .with_inner_size([860.0, 760.0])
-                .with_min_inner_size([660.0, 500.0]),
+            viewport: main_viewport_builder(cfg!(target_os = "windows")),
             run_and_return: true,
             ..Default::default()
         };
