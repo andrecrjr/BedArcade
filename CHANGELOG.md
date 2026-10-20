@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.1.0...desktop-v0.2.0) (2026-10-20)
+
+
+### Features
+
+* **desktop:** localize and persist desktop settings ([56c4fb7](https://github.com/andrecrjr/GamepadDesktop/commit/56c4fb7dd7bf979bb28b89abbd38c72f86e3c250))
+
 # [0.1.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.0.0...desktop-v0.1.0) (2026-10-20)
 
 
