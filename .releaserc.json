@@ -5,6 +5,19 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["CHANGELOG.md"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]"
+      }
+    ],
+    [
       "@semantic-release/github",
       {
         "assets": [
@@ -15,6 +28,10 @@
           {
             "path": "desktop/dist/GamepadDesktop-Linux-x64.tar.gz",
             "label": "Gamepad Desktop for Linux x64"
+          },
+          {
+            "path": "CHANGELOG.md",
+            "label": "Gamepad Desktop changelog"
           }
         ],
         "successComment": false,
