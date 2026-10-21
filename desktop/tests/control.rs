@@ -9,7 +9,7 @@ const TICK: Duration = Duration::from_millis(10);
 
 fn ready() -> (MouseController, ControlSettings) {
     let mut controller = MouseController::default();
-    let mut settings = ControlSettings::default();
+    let mut settings = ControlSettin``gs::default();
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     (controller, settings)
 }

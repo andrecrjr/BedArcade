@@ -136,34 +136,18 @@ pub fn create_tray(
 }
 
 fn gamepad_icon() -> Result<Icon, String> {
-    let icon = gamepad_icon_data();
+    let icon = gamepad_icon_data(32);
     Icon::from_rgba(icon.rgba, icon.width, icon.height).map_err(|error| error.to_string())
 }
 
-pub fn gamepad_icon_data() -> IconData {
-    let mut rgba = vec![0; 32 * 32 * 4];
-    for y in 0..32 {
-        for x in 0..32 {
-            let body = (4..28).contains(&x) && (9..23).contains(&y)
-                || (4..11).contains(&x) && (20..28).contains(&y)
-                || (21..28).contains(&x) && (20..28).contains(&y);
-            let detail = (8..15).contains(&x) && (14..17).contains(&y)
-                || (10..13).contains(&x) && (12..19).contains(&y)
-                || (21..24).contains(&x) && (12..15).contains(&y)
-                || (24..27).contains(&x) && (16..19).contains(&y);
-            let color = if detail {
-                [255, 255, 255, 255]
-            } else if body {
-                [22, 170, 150, 255]
-            } else {
-                [0, 0, 0, 0]
-            };
-            rgba[(y * 32 + x) * 4..(y * 32 + x + 1) * 4].copy_from_slice(&color);
-        }
-    }
+pub fn gamepad_icon_data(size: u32) -> IconData {
+    let image = image::load_from_memory(include_bytes!("../assets/gamepad-desktop.png"))
+        .expect("embedded desktop icon is a valid PNG")
+        .resize_exact(size, size, image::imageops::FilterType::Lanczos3)
+        .into_rgba8();
     IconData {
-        rgba,
-        width: 32,
-        height: 32,
+        rgba: image.into_raw(),
+        width: size,
+        height: size,
     }
 }

@@ -21,6 +21,11 @@ mod keyboard_view;
 mod windows_keyboard_overlay;
 
 type SharedDesktop = Arc<Mutex<DesktopRuntime>>;
+const TWO_COLUMN_LAYOUT_MIN_WIDTH: f32 = 960.0;
+
+fn uses_two_columns(available_width: f32) -> bool {
+    available_width >= TWO_COLUMN_LAYOUT_MIN_WIDTH
+}
 
 struct GamepadDesktopApp {
     desktop: SharedDesktop,
@@ -77,7 +82,7 @@ impl eframe::App for GamepadDesktopApp {
                 let tray_menu = self.tray_menu.as_ref();
                 let mapping_text = &mut self.mapping_text;
                 let style = ui.style().clone();
-                if ui.available_width() >= 760.0 {
+                if uses_two_columns(ui.available_width()) {
                     ui.columns(2, |columns| {
                         egui::Frame::group(&style).show(&mut columns[0], |ui| {
                             show_desktop_overview(ui, &state, desktop);
@@ -523,7 +528,7 @@ fn keyboard_viewport_builder(
 fn main_viewport_builder(windows: bool) -> egui::ViewportBuilder {
     egui::ViewportBuilder::default()
         .with_title("Gamepad Desktop")
-        .with_icon(gamepad_icon_data())
+        .with_icon(gamepad_icon_data(512))
         .with_inner_size([860.0, 760.0])
         .with_min_inner_size([660.0, 500.0])
         // eframe shares the root GL config with child viewports.
@@ -826,5 +831,11 @@ mod tests {
             });
         });
         output.textures_delta.clear();
+    }
+
+    #[test]
+    fn default_window_width_uses_a_single_column_layout() {
+        assert!(!uses_two_columns(860.0));
+        assert!(uses_two_columns(TWO_COLUMN_LAYOUT_MIN_WIDTH));
     }
 }
