@@ -1,3 +1,15 @@
+# [0.3.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.2.0...desktop-v0.3.0) (2026-10-22)
+
+
+### Bug Fixes
+
+* **desktop:** correct test setup and roadmap links ([ab04a60](https://github.com/andrecrjr/GamepadDesktop/commit/ab04a60b13cf864ef76c47a7e8d3a98538c74be7))
+
+
+### Features
+
+* add desktop assets and improve icon handling; update dependencies and workflows ([0a98297](https://github.com/andrecrjr/GamepadDesktop/commit/0a982973f016c1694df11d810e2fc8617cf8c9a0))
+
 # [0.2.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.1.0...desktop-v0.2.0) (2026-10-20)
 
 
