@@ -37,7 +37,6 @@ Esta entrega prioriza as partes de entrada e mouse das etapas 1, 2, 3, 5 e 7. A 
 - [x] Validar build/link de SDL3 no executável GUI x64.
 - [ ] Validar entrada de texto e controle físico no Windows 11.
 - [ ] Validar mover, clicar, arrastar, rolar e abrir um programa no COSMIC/Wayland com o 8BitDo Ultimate 2 conectado.
-- [ ] teste
 - [ ] Validar em Windows, Linux/X11 e outros compositores Wayland.
 
 As etapas completas abaixo só terminam quando seus critérios de validação forem atendidos.
@@ -149,5 +148,5 @@ Estas combinações são propostas; ainda não estão implementadas:
 - [Windows `SendInput`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
 - [AT-SPI2](https://wiki.freedesktop.org/www/Accessibility/AT-SPI2/)
 - [Portal XDG Remote Desktop](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.RemoteDesktop.html)
-- [Comportamento atual da extensão: navegação espacial](../lib/spatial.ts)
-- [Comportamento atual da extensão: teclado flutuante](../lib/floating-keyboard.ts)
+- [Comportamento atual da extensão: navegação espacial](../extension/lib/spatial.ts)
+- [Comportamento atual da extensão: teclado flutuante](../extension/lib/floating-keyboard.ts)
