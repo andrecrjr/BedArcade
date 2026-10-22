@@ -90,6 +90,7 @@ impl WaylandKeyboardOverlay {
             height: surface_height,
             configured: false,
             dirty: true,
+            position_dirty: true,
         };
         state.context.set_visuals(egui::Visuals::dark());
         state.pool = Some(
@@ -118,7 +119,15 @@ impl WaylandKeyboardOverlay {
     }
 
     pub fn update(&mut self, session: &KeyboardSession) -> Result<(), String> {
-        self.position(session)?;
+        if self.state.position_dirty
+            || self.state.session.focused_input.map(|input| input.bounds)
+                != session.focused_input.map(|input| input.bounds)
+            || self.state.session.settings.surface_size() != session.settings.surface_size()
+            || self.state.session.settings.position != session.settings.position
+        {
+            self.position(session)?;
+            self.state.position_dirty = false;
+        }
         if self.state.session != *session {
             self.state.session = session.clone();
             self.state.dirty = true;
@@ -273,6 +282,7 @@ struct OverlayState {
     height: u32,
     configured: bool,
     dirty: bool,
+    position_dirty: bool,
 }
 
 impl OverlayState {
@@ -403,11 +413,17 @@ impl OutputHandler for OverlayState {
         &mut self.output_state
     }
 
-    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 
-    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 
-    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 }
 
 impl SeatHandler for OverlayState {
