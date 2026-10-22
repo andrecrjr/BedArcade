@@ -2,7 +2,6 @@ pub mod control;
 pub mod focused_input;
 pub mod gamepads;
 pub mod i18n;
-pub mod item_navigation;
 pub mod keyboard;
 pub mod placement;
 pub mod preferences;

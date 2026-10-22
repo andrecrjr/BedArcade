@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use gamepad_desktop::control::{
-    Action, Button, ControlSettings, Direction, GamepadFrame, MouseButton, MouseController,
-    NavigationMode, SystemKey,
+    Action, Button, ControlSettings, GamepadFrame, MouseButton, MouseController, SystemKey,
 };
 
 const TICK: Duration = Duration::from_millis(10);
@@ -20,132 +19,34 @@ fn pressed(button: Button) -> GamepadFrame {
     frame
 }
 
-fn toggle_items(controller: &mut MouseController, settings: &mut ControlSettings) {
-    let frame = GamepadFrame {
-        left_trigger: 0.6,
-        right_trigger: 0.6,
-        ..Default::default()
-    };
-    assert_eq!(
-        controller.update(Some(&frame), TICK, settings),
-        vec![Action::ModeChanged(NavigationMode::Items)]
-    );
-    assert_eq!(controller.mode, NavigationMode::Items);
-    controller.update(Some(&GamepadFrame::default()), TICK, settings);
-}
-
 #[test]
-fn trigger_chord_toggles_modes_once_and_rearms_after_release() {
+fn dpad_sends_arrow_keys_while_mouse_and_drag_work() {
     let (mut controller, mut settings) = ready();
-    let both = GamepadFrame {
-        left_trigger: 0.6,
-        right_trigger: 0.6,
-        ..Default::default()
-    };
-    assert_eq!(
-        controller.update(Some(&both), TICK, &mut settings),
-        vec![Action::ModeChanged(NavigationMode::Items)]
-    );
+    let mut frame = pressed(Button::Down);
+    frame.x = 1.0;
+    frame.buttons[Button::South as usize] = true;
+    let actions = controller.update(Some(&frame), TICK, &mut settings);
+    assert!(actions.contains(&Action::Mouse(MouseButton::Left, true)));
+    assert!(actions.contains(&Action::Key(SystemKey::Down)));
     assert!(
-        controller
-            .update(Some(&both), TICK, &mut settings)
-            .is_empty()
-    );
-    assert_eq!(controller.mode, NavigationMode::Items);
-    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
-    assert_eq!(
-        controller.update(Some(&both), TICK, &mut settings),
-        vec![Action::ModeChanged(NavigationMode::Mouse)]
-    );
-    assert_eq!(controller.mode, NavigationMode::Mouse);
-}
-
-#[test]
-fn trigger_chord_requires_both_triggers_and_is_ignored_with_keyboard_open() {
-    let (mut controller, mut settings) = ready();
-    for frame in [
-        GamepadFrame {
-            left_trigger: 0.9,
-            right_trigger: 0.54,
-            ..Default::default()
-        },
-        GamepadFrame {
-            left_trigger: 0.54,
-            right_trigger: 0.9,
-            ..Default::default()
-        },
-    ] {
-        assert!(
-            controller
-                .update(Some(&frame), TICK, &mut settings)
-                .is_empty()
-        );
-        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
-    }
-    assert_eq!(controller.mode, NavigationMode::Mouse);
-
-    controller.set_system_keyboard_uses_gamepad(true);
-    controller.update(Some(&pressed(Button::RightStick)), TICK, &mut settings);
-    let held = GamepadFrame {
-        left_trigger: 1.0,
-        right_trigger: 1.0,
-        ..Default::default()
-    };
-    assert!(
-        controller
-            .update(Some(&held), TICK, &mut settings)
-            .is_empty()
-    );
-    assert_eq!(controller.mode, NavigationMode::Mouse);
-}
-
-#[test]
-fn item_mode_moves_by_dpad_and_dominant_left_stick_without_mouse_actions() {
-    let (mut controller, mut settings) = ready();
-    toggle_items(&mut controller, &mut settings);
-    assert_eq!(
-        controller.update(Some(&pressed(Button::Down)), TICK, &mut settings),
-        vec![Action::ItemDirection(Direction::Down)]
-    );
-    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
-    let axis = GamepadFrame {
-        x: -0.8,
-        y: 0.4,
-        ..Default::default()
-    };
-    assert_eq!(
-        controller.update(Some(&axis), TICK, &mut settings),
-        vec![Action::ItemDirection(Direction::Left)]
-    );
-    assert!(
-        controller
-            .update(Some(&axis), TICK, &mut settings)
-            .is_empty()
+        actions
+            .iter()
+            .any(|action| matches!(action, Action::Move(x, 0) if *x > 0))
     );
 }
 
 #[test]
-fn item_mode_confirm_and_cancel_keep_face_button_mapping_without_pointer_clicks() {
+fn x_sends_enter_and_y_sends_escape() {
     let (mut controller, mut settings) = ready();
-    toggle_items(&mut controller, &mut settings);
     assert_eq!(
         controller.update(Some(&pressed(Button::West)), TICK, &mut settings),
-        vec![Action::ItemActivate]
+        vec![Action::Key(SystemKey::Enter)]
     );
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     assert_eq!(
         controller.update(Some(&pressed(Button::North)), TICK, &mut settings),
-        vec![Action::ItemCancel]
+        vec![Action::Key(SystemKey::Escape)]
     );
-    for button in [Button::South, Button::East] {
-        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
-        assert!(
-            controller
-                .update(Some(&pressed(button)), TICK, &mut settings)
-                .iter()
-                .all(|action| !matches!(action, Action::Mouse(_, _) | Action::Move(_, _)))
-        );
-    }
 }
 
 #[test]
@@ -336,7 +237,7 @@ fn l3_opens_launcher_once_and_shoulders_navigate_apps() {
 }
 
 #[test]
-fn dpad_repeats_after_delay_without_repeating_confirm() {
+fn dpad_arrow_keys_repeat_after_delay_without_repeating_confirm() {
     let (mut controller, mut settings) = ready();
     let mut frame = pressed(Button::Down);
     frame.buttons[Button::West as usize] = true;

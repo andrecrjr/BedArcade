@@ -2,9 +2,9 @@
 
 Use o controle para navegar pelo computador, mover o ponteiro e digitar sem tirar o foco do aplicativo que você está usando.
 
-O app tem três recursos principais: modo mouse, navegação pelos itens que cada aplicativo disponibiliza para acessibilidade e um teclado visual próprio. Ele continua funcionando quando o painel é recolhido para a bandeja do sistema.
+O app controla o ponteiro e envia comandos de teclado, além de oferecer um teclado visual próprio. Ele continua funcionando quando o painel é recolhido para a bandeja do sistema.
 
-> O desktop está em desenvolvimento. A navegação depende do suporte de cada aplicativo, e ainda falta validar o uso com controles físicos em toda a matriz de Windows e Linux.
+> O desktop está em desenvolvimento. Cada aplicativo interpreta as teclas recebidas à sua maneira, e ainda falta validar o uso com controles físicos em Windows e Linux.
 
 ![Prévia do teclado visual](keyboard-preview.png)
 
@@ -18,25 +18,30 @@ No Linux, baixe e extraia o [pacote x64](dist/GamepadDesktop-Linux-x64.tar.gz). 
 
 | Controle                             | Ação                                                   |
 | ------------------------------------ | ------------------------------------------------------ |
-| Analógico esquerdo                   | Mover o ponteiro ou navegar pelos itens                |
-| Analógico direito, cima/baixo        | Rolar a página                                         |
-| Direcional                           | Enviar setas ou mover o foco                           |
-| Botão inferior — A / ✕ / B no Switch | Clicar; no teclado visual, digitar a tecla selecionada |
-| L2 + R2                              | Alternar entre mouse e navegação por itens             |
-| R3 — pressionar o analógico direito  | Abrir ou fechar o teclado visual                       |
-| Start / Menu / +                     | Pausar ou retomar                                      |
+| Analógico esquerdo                    | Mover o ponteiro                                        |
+| Analógico direito, cima/baixo         | Rolar a página                                          |
+| Direcional                            | Enviar setas; segurar para repetir                      |
+| Botão inferior — A / ✕ / B no Switch  | Clicar; no teclado visual, digitar a tecla selecionada  |
+| Botão direito — B / ○ / A no Switch   | Clique direito                                           |
+| Botão esquerdo — X / □ / Y no Switch  | Enter                                                    |
+| Botão superior — Y / △ / X no Switch  | Escape                                                   |
+| L3                                    | Abrir o lançador do sistema                             |
+| LB / L1                               | Tab                                                      |
+| RB / R1                               | Alt+Tab                                                  |
+| R3 — pressionar o analógico direito   | Abrir ou fechar o teclado visual                        |
+| Start / Menu / +                      | Pausar ou retomar                                       |
 
 Os nomes e comandos completos aparecem no painel, incluindo os equivalentes de Xbox, PlayStation e Switch. A seção de ajustes permite escolher o controle, ajustar velocidade e personalizar o teclado.
 
 ## O que saber antes de usar
 
-- A navegação por itens funciona quando o aplicativo publica seus controles para acessibilidade. Quando isso não acontece, use o modo mouse.
+- As setas do direcional são enviadas ao aplicativo ativo; o suporte depende do próprio aplicativo.
 - O teclado visual usa o layout QWERTY em inglês. No Linux, símbolos e acentos podem variar conforme o layout ativo.
 - Em algumas sessões Wayland, incluindo o GNOME Wayland, o teclado visual não está disponível.
 - Os pacotes Windows e Linux existem, mas o uso com controle físico ainda precisa de validação em Windows 11, Linux/X11 e Wayland.
 
 ## Documentação
 
-- [Como o sistema funciona](docs/system-overview.md): modos, fluxo do controle, diferenças entre sistemas, limites e execução.
+- [Como o sistema funciona](docs/system-overview.md): controles, fluxo do controle, diferenças entre sistemas, limites e execução.
 - [Pesquisa do teclado visual](docs/keyboard-research.md): decisões de layout, foco e posicionamento.
 - [Roadmap](docs/roadmap.md): trabalho concluído e validações pendentes.

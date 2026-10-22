@@ -34,10 +34,6 @@ impl Platform {
     pub fn apply(&mut self, action: Action) -> Result<(), String> {
         let result = match action {
             Action::OnScreenKeyboard(_) => return Ok(()),
-            Action::ModeChanged(_)
-            | Action::ItemDirection(_)
-            | Action::ItemActivate
-            | Action::ItemCancel => return Ok(()),
             Action::Move(x, y) => self.input.move_mouse(x, y, Coordinate::Rel),
             Action::Scroll(amount) => self.input.scroll(amount, ScrollAxis::Vertical),
             Action::Mouse(button, pressed) => self.input.button(

@@ -40,6 +40,7 @@ export interface GamepadState {
 export interface GamepadControllerOptions {
   onAction: (action: GamepadAction) => void;
   onStateChange: (state: GamepadState) => void;
+  moveWithLeftStick?: boolean;
 }
 
 type E2EMessage = { type: typeof E2E_GAMEPAD_MESSAGE; frame: GamepadFrame | null };
@@ -80,7 +81,11 @@ export function createGamepadReader(): () => GamepadFrame | null {
     navigator.getGamepads().find((pad): pad is Gamepad => pad !== null && pad.connected) ?? null;
 }
 
-export function startGamepadController({ onAction, onStateChange }: GamepadControllerOptions) {
+export function startGamepadController({
+  onAction,
+  onStateChange,
+  moveWithLeftStick = true,
+}: GamepadControllerOptions) {
   const readGamepad = createGamepadReader();
   let frame = 0;
   let stopped = false;
@@ -164,7 +169,7 @@ export function startGamepadController({ onAction, onStateChange }: GamepadContr
         else if (pressed(bindings.moveDown)) direction = 'down';
         else if (pressed(bindings.moveLeft)) direction = 'left';
         else if (pressed(bindings.moveRight)) direction = 'right';
-        else if (Math.abs(x) > 0.55 || Math.abs(y) > 0.55) {
+        else if (moveWithLeftStick && (Math.abs(x) > 0.55 || Math.abs(y) > 0.55)) {
           direction =
             Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : y > 0 ? 'down' : 'up';
         }

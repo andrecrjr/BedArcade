@@ -58,6 +58,8 @@ Para validar um controle físico manualmente:
 5. Com o teclado virtual aberto, B o fecha; fora dele, B volta. LB/RB trocam abas.
 6. Os atalhos iniciais incluem AC-JR, YouTube, Google, Steam, CrazyGames e jogos de navegador do itch.io. Adicione, edite ou remova atalhos no launcher.
 
+Em sites, o destaque espacial acompanha o mouse sobre controles visíveis. O D-pad continua navegando entre controles sem mover o ponteiro; passar o mouse não altera o foco real da página.
+
 ## Limitações conhecidas
 
 - O override da nova aba não é usado em janelas anônimas do Chrome.

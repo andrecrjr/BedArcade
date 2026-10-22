@@ -46,19 +46,11 @@ fn virtual_sdl_controller_normalizes_axes_buttons_and_disconnects() {
     joystick.set_virtual_axis(0, i16::MAX).unwrap();
     joystick.set_virtual_axis(1, i16::MIN).unwrap();
     joystick.set_virtual_axis(3, i16::MAX).unwrap();
-    joystick.set_virtual_axis(4, i16::MAX).unwrap();
-    joystick.set_virtual_axis(5, 0).unwrap();
     joystick.set_virtual_button(0, true).unwrap();
     joystick.set_virtual_button(8, true).unwrap();
     joystick.set_virtual_button(7, true).unwrap();
     let frame = reader.poll(Some(id.raw())).unwrap().unwrap();
     assert_eq!((frame.x, frame.y, frame.scroll), (1.0, -1.0, 1.0));
-    assert!((frame.left_trigger - 1.0).abs() < 0.001);
-    assert!(
-        (frame.right_trigger - 0.5).abs() < 0.002,
-        "right trigger was {}",
-        frame.right_trigger
-    );
     assert!(frame.pressed(Button::South));
     assert!(frame.pressed(Button::RightStick));
     assert!(frame.pressed(Button::LeftStick));
