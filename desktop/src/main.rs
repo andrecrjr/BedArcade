@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, RichText};
 use gamepad_desktop::runtime::{DesktopRuntime, RuntimeState};
 use gamepad_desktop::tray::{PanelControl, TrayAction, TrayMenu, create_tray, gamepad_icon_data};
 use gamepad_desktop::{
-    control::{ITEM_SHORTCUTS, KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS, NavigationMode},
+    control::{KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS},
     i18n::{Locale, Text},
     keyboard::{self, KeyboardPosition, KeyboardPresentation, KeyboardSession},
 };
@@ -136,10 +136,7 @@ fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &Shar
         ui.label(if state.keyboard.open {
             locale.text(Text::KeyboardActive)
         } else if state.settings.enabled {
-            match state.mode {
-                NavigationMode::Mouse => locale.text(Text::MouseMode),
-                NavigationMode::Items => locale.text(Text::ItemsMode),
-            }
+            locale.text(Text::MouseMode)
         } else {
             locale.text(Text::Paused)
         });
@@ -163,22 +160,13 @@ fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &Shar
             } else if !state.settings.enabled {
                 locale.text(Text::PausedLabel)
             } else {
-                match state.mode {
-                    NavigationMode::Mouse => locale.text(Text::MouseLabel),
-                    NavigationMode::Items => locale.text(Text::ItemsLabel),
-                }
+                locale.text(Text::MouseLabel)
             })
             .strong()
             .size(20.0)
             .color(Color32::LIGHT_GREEN),
         );
     });
-    if state.settings.enabled
-        && state.mode == NavigationMode::Items
-        && let Some(status) = &state.item_status
-    {
-        ui.small(locale.translate(status));
-    }
     if state.keyboard.presentation != KeyboardPresentation::Unavailable
         && let Some(status) = &state.keyboard.status
     {
@@ -194,15 +182,7 @@ fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &Shar
     }
     ui.separator();
     ui.heading(locale.text(Text::DesktopCommands));
-    shortcut_guide(
-        ui,
-        locale,
-        if state.mode == NavigationMode::Items {
-            ITEM_SHORTCUTS
-        } else {
-            MOUSE_SHORTCUTS
-        },
-    );
+    shortcut_guide(ui, locale, MOUSE_SHORTCUTS);
     ui.collapsing(locale.text(Text::KeyboardCommands), |ui| {
         shortcut_guide(ui, locale, KEYBOARD_SHORTCUTS);
     });

@@ -4,9 +4,9 @@
 
 ## Objetivo de conclusão
 
-Operar o desktop pelo controle em Windows e Linux: navegar por elementos acessíveis, usar o ponteiro quando a navegação semântica não estiver disponível, digitar com um teclado visual próprio sem perder o foco do aplicativo e trocar/acionar janelas e funções do sistema.
+Operar o desktop pelo controle em Windows e Linux: mover o ponteiro, enviar setas e atalhos, digitar com um teclado visual próprio sem perder o foco do aplicativo e trocar/acionar janelas e funções do sistema.
 
-“Completo” significa cobrir uma matriz publicada de sistemas e aplicativos. Aplicativos que não expõem a interface por acessibilidade ainda precisam funcionar no modo mouse; não se deve prometer navegação por elementos em todo aplicativo.
+“Completo” significa cobrir uma matriz publicada de sistemas e aplicativos, incluindo as diferenças de entrada e permissões entre os sistemas.
 
 ## Estado atual
 
@@ -22,9 +22,9 @@ Operar o desktop pelo controle em Windows e Linux: navegar por elementos acessí
 - [x] Pausa por Start, liberação de cliques ao desconectar e retomada após centralizar/soltar o controle.
 - [ ] Concluir a validação física de controle de outros aplicativos e janelas.
 
-## Corte atual: modos mouse e itens, e teclado visual próprio
+## Corte atual: mouse, teclado e teclado visual próprio
 
-Esta entrega prioriza as partes de entrada, mouse, itens e teclado das etapas 1, 2, 3, 5 e 7. A navegação por itens está implementada na base; a validação física e a matriz de compatibilidade continuam pendentes. A digitação básica está ligada ao foco atual, mas precisa de validação física e de suporte a layouts Linux não US.
+Esta entrega prioriza a entrada por mouse e teclado e o teclado visual. A navegação por itens acessíveis foi retirada do corte atual; o direcional envia setas ao aplicativo. A validação física e a matriz de compatibilidade continuam pendentes. A digitação básica está ligada ao foco atual, mas precisa de validação física e de suporte a layouts Linux não US.
 
 - [x] Painel com conexão, pausa, velocidade e zona morta.
 - [x] Loop de controle independente do foco da janela do app.
@@ -70,24 +70,16 @@ As etapas completas abaixo só terminam quando seus critérios de validação fo
 
 ### 3. Criar os adaptadores nativos de cada sistema
 
-- [ ] Fazer uma prova de conceito de acessibilidade, foco, injeção de texto/ponteiro e enumeração de janelas em Windows, Linux/Wayland e Linux/X11.
+- [ ] Fazer uma prova de conceito para obter a posição do campo de texto, enviar entrada de ponteiro/teclado e enumerar janelas em Windows, Linux/Wayland e Linux/X11.
 - [ ] Comparar as APIs e as bibliotecas Rust disponíveis antes de definir os contratos comuns. Manter detalhes específicos do sistema nos adaptadores.
 - [ ] Expor capacidades disponíveis e indisponíveis por sessão, com mensagens de erro úteis e sem travar o restante do app.
 - [ ] Documentar permissões, prompts do sistema, dependências de runtime e limitações por compositor.
 
-**Pronto quando:** há um teste mínimo por sistema para ler foco, acionar um elemento acessível e enviar entrada de mouse/teclado, com falhas explicadas.
+**Pronto quando:** há uma checagem mínima por sistema para obter a posição do campo de texto e enviar entrada de mouse/teclado, com falhas explicadas.
 
-### 4. Implementar o modo item por item
+### 4. Navegação por itens (fora do escopo atual)
 
-- [x] Windows: consultar a árvore UI Automation da janela focada, navegar por controles visíveis/focáveis e usar padrões de ação acessíveis.
-- [x] Linux: consultar a janela ativa via AT-SPI, mover o foco, rolar o item para a tela e acionar ações disponíveis.
-- [x] Ignorar itens ocultos/desabilitados, escolher o vizinho espacial mais próximo e oferecer confirmação/cancelamento.
-- [x] Alternar entre modo mouse e modo itens por L2 + R2; manter o modo mouse como padrão ao iniciar e mostrar o estado da árvore no painel.
-- [ ] Validar menus, listas, caixas de seleção, abas, diálogos e campos de formulário em aplicativos reais; completar entrada/saída de grupos quando a árvore exigir tratamento específico.
-- [ ] Criar uma matriz de compatibilidade para navegador, gerenciador de arquivos, configurações e editor de texto.
-- [x] Quando a árvore não existir ou não tiver itens navegáveis, mostrar a limitação e permitir voltar ao modo mouse.
-
-**Pronto quando:** os itens acessíveis de cada aplicativo da matriz podem ser focados e acionados sem usar o ponteiro.
+A navegação por itens acessíveis foi retirada. O direcional volta a enviar setas ao aplicativo ativo, que controla o próprio foco.
 
 ### 5. Implementar o modo mouse
 

@@ -8,10 +8,9 @@ use std::{
 };
 
 use crate::{
-    control::{Action, ControlSettings, GamepadFrame, MouseController, NavigationMode, SystemKey},
+    control::{Action, ControlSettings, GamepadFrame, MouseController},
     gamepads::{GamepadInfo, Gamepads},
     i18n::Locale,
-    item_navigation::ItemNavigator,
     keyboard::{KeyboardSession, KeyboardSettings},
     platform::Platform,
     preferences::DesktopPreferences,
@@ -28,8 +27,6 @@ pub struct RuntimeState {
     pub selected: Option<u32>,
     pub mapping_message: Option<String>,
     pub keyboard: KeyboardSession,
-    pub mode: NavigationMode,
-    pub item_status: Option<String>,
     pub preferences_error: Option<String>,
     pending_mapping: Option<String>,
 }
@@ -127,7 +124,6 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     let input_tracker = crate::focused_input::InputTracker::default();
     let mut platform = Platform::new()?;
     let mut gamepads = Gamepads::new().map_err(|error| format!("SDL3: {error}"))?;
-    let item_navigation = ItemNavigator::default();
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
     let mut controller = MouseController::default();
     controller.keyboard.settings = state.lock().expect("runtime state lock").keyboard.settings;
@@ -229,37 +225,8 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                         let mut runtime_state = state.lock().expect("runtime state lock");
                         runtime_state.keyboard = controller.keyboard.clone();
                     }
-                    Action::ModeChanged(mode) => {
-                        item_navigation.set_enabled(mode == NavigationMode::Items)
-                    }
-                    Action::ItemDirection(direction) => item_navigation.move_focus(direction),
-                    Action::ItemActivate => item_navigation.activate(),
-                    Action::ItemCancel => {
-                        platform.apply(Action::Key(SystemKey::Escape))?;
-                        item_navigation.refresh();
-                    }
-                    Action::Key(key) => {
-                        platform.apply(Action::Key(key))?;
-                        if controller.mode == NavigationMode::Items {
-                            item_navigation.refresh();
-                        }
-                    }
-                    Action::NextWindow => {
-                        platform.apply(Action::NextWindow)?;
-                        if controller.mode == NavigationMode::Items {
-                            item_navigation.refresh();
-                        }
-                    }
-                    action => {
-                        platform.apply(action)?;
-                    }
+                    action => platform.apply(action)?,
                 }
-            }
-            {
-                let mut runtime_state = state.lock().expect("runtime state lock");
-                runtime_state.mode = controller.mode;
-                runtime_state.item_status =
-                    (controller.mode == NavigationMode::Items).then(|| item_navigation.status());
             }
             let preferences = {
                 let state = state.lock().expect("runtime state lock");
@@ -325,7 +292,6 @@ fn update_control(
     controller.keyboard.settings = state.keyboard.settings;
     controller.keyboard.locale = state.locale;
     let actions = controller.update(frame, elapsed, &mut state.settings);
-    state.mode = controller.mode;
     state.keyboard = controller.keyboard.clone();
     actions
 }
