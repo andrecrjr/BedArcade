@@ -39,6 +39,8 @@ pub struct WaylandKeyboardOverlay {
     layer_shell: LayerShell,
     output: Option<wl_output::WlOutput>,
     placement: Option<crate::placement::Rect>,
+    #[cfg(test)]
+    position_updates: usize,
 }
 
 impl WaylandKeyboardOverlay {
@@ -88,6 +90,7 @@ impl WaylandKeyboardOverlay {
             height: surface_height,
             configured: false,
             dirty: true,
+            position_dirty: true,
         };
         state.context.set_visuals(egui::Visuals::dark());
         state.pool = Some(
@@ -103,6 +106,8 @@ impl WaylandKeyboardOverlay {
             layer_shell,
             output: None,
             placement: None,
+            #[cfg(test)]
+            position_updates: 0,
         };
         overlay
             .queue
@@ -114,7 +119,15 @@ impl WaylandKeyboardOverlay {
     }
 
     pub fn update(&mut self, session: &KeyboardSession) -> Result<(), String> {
-        self.position(session)?;
+        if self.state.position_dirty
+            || self.state.session.focused_input.map(|input| input.bounds)
+                != session.focused_input.map(|input| input.bounds)
+            || self.state.session.settings.surface_size() != session.settings.surface_size()
+            || self.state.session.settings.position != session.settings.position
+        {
+            self.position(session)?;
+            self.state.position_dirty = false;
+        }
         if self.state.session != *session {
             self.state.session = session.clone();
             self.state.dirty = true;
@@ -158,6 +171,10 @@ impl WaylandKeyboardOverlay {
     }
 
     fn position(&mut self, session: &KeyboardSession) -> Result<(), String> {
+        #[cfg(test)]
+        {
+            self.position_updates += 1;
+        }
         let outputs: Vec<_> = self
             .state
             .output_state
@@ -265,6 +282,7 @@ struct OverlayState {
     height: u32,
     configured: bool,
     dirty: bool,
+    position_dirty: bool,
 }
 
 impl OverlayState {
@@ -395,11 +413,17 @@ impl OutputHandler for OverlayState {
         &mut self.output_state
     }
 
-    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 
-    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 
-    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {}
+    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: wl_output::WlOutput) {
+        self.position_dirty = true;
+    }
 }
 
 impl SeatHandler for OverlayState {
@@ -450,3 +474,81 @@ delegate_output!(OverlayState);
 delegate_registry!(OverlayState);
 delegate_seat!(OverlayState);
 delegate_shm!(OverlayState);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{focused_input::FocusedInput, placement::Rect};
+
+    #[test]
+    #[ignore = "requires a Wayland compositor supporting wlr-layer-shell"]
+    fn positioning_tracks_geometry_and_output_changes_without_repeating_idle_work() {
+        let mut overlay = WaylandKeyboardOverlay::new().unwrap();
+        let mut session = KeyboardSession::default();
+        overlay.update(&session).unwrap();
+        let mut expected = overlay.position_updates;
+        overlay.update(&session).unwrap();
+        assert_eq!(overlay.position_updates, expected, "idle update");
+
+        session.open = true;
+        session.move_selection(0, 1);
+        session.settings.opacity = 200;
+        overlay.update(&session).unwrap();
+        assert_eq!(overlay.position_updates, expected, "visual changes only");
+
+        session.focused_input = Some(FocusedInput {
+            bounds: Rect {
+                x: 100,
+                y: 100,
+                width: 240,
+                height: 40,
+            },
+            screen: None,
+        });
+        overlay.update(&session).unwrap();
+        expected += 1;
+        assert_eq!(overlay.position_updates, expected, "focused input appeared");
+        session.focused_input.as_mut().unwrap().bounds.y = 500;
+        overlay.update(&session).unwrap();
+        expected += 1;
+        assert_eq!(overlay.position_updates, expected, "focused input moved");
+
+        session.settings.width = 800;
+        overlay.update(&session).unwrap();
+        expected += 1;
+        assert_eq!(overlay.position_updates, expected, "keyboard resized");
+        session.settings.position = KeyboardPosition::Top;
+        overlay.update(&session).unwrap();
+        expected += 1;
+        assert_eq!(overlay.position_updates, expected, "docking changed");
+
+        let output = overlay.state.output_state.outputs().next().unwrap();
+        for callback in [
+            <OverlayState as OutputHandler>::new_output,
+            <OverlayState as OutputHandler>::update_output,
+            <OverlayState as OutputHandler>::output_destroyed,
+        ] {
+            callback(
+                &mut overlay.state,
+                &overlay.connection,
+                &overlay.queue.handle(),
+                output.clone(),
+            );
+            overlay.update(&session).unwrap();
+            expected += 1;
+            assert_eq!(overlay.position_updates, expected, "monitor event");
+        }
+        session.focused_input = None;
+        overlay.update(&session).unwrap();
+        expected += 1;
+        assert_eq!(
+            overlay.position_updates, expected,
+            "focused input disappeared"
+        );
+        overlay.update(&session).unwrap();
+        assert_eq!(
+            overlay.position_updates, expected,
+            "idle after geometry change"
+        );
+    }
+}

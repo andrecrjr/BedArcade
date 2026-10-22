@@ -39,8 +39,6 @@ impl Locale {
             "B / botão direito" => Some(Text::EastButtonShort),
             "X / botão esquerdo" => Some(Text::WestButtonShort),
             "Y / botão superior" => Some(Text::NorthButtonShort),
-            "Direcional / analógico esquerdo" => Some(Text::DpadOrLeftStick),
-            "Alternar entre modo mouse e navegação por itens" => Some(Text::ToggleModes),
             "Abrir / fechar teclado visual próprio" => Some(Text::ToggleKeyboard),
             "Lançador do sistema · Super / Windows" => Some(Text::SystemLauncher),
             "Mover ponteiro" => Some(Text::MovePointer),
@@ -63,35 +61,6 @@ impl Locale {
             "Ativar ou desativar Shift" => Some(Text::ToggleShift),
             "Fechar o teclado visual" => Some(Text::CloseKeyboard),
             "Ajustes do teclado · direcional escolhe e altera" => Some(Text::KeyboardSettingsHelp),
-            "Mover o foco entre itens próximos" => Some(Text::MoveNearbyItems),
-            "Ativar o item focado" => Some(Text::ActivateFocusedItem),
-            "Cancelar com Escape" => Some(Text::CancelWithEscape),
-            "Ative o modo itens para consultar a árvore de acessibilidade." => {
-                Some(Text::ItemsEnablePrompt)
-            }
-            "Lendo os itens acessíveis da janela ativa…" => Some(Text::ReadingItems),
-            "AT-SPI não identificou uma janela ativa para navegar." => {
-                Some(Text::AtspiNoActiveWindow)
-            }
-            "Esta janela não expõe itens interativos visíveis pela acessibilidade." => {
-                Some(Text::NoVisibleAccessibleItems)
-            }
-            "Não há outro item nessa direção." => Some(Text::NoItemInDirection),
-            "O aplicativo não aceitou o foco deste item." => Some(Text::FocusRejected),
-            "Nenhum item está focado para ativar." => Some(Text::NoFocusedItem),
-            "Item ativado." => Some(Text::ItemActivated),
-            "O item focado não oferece uma ação de ativação AT-SPI." => {
-                Some(Text::AtspiNoActivationAction)
-            }
-            "Modo itens pausado." => Some(Text::ItemsPaused),
-            "Nenhum item acessível foi encontrado." => Some(Text::NoAccessibleItems),
-            "UI Automation indisponível: não foi possível inicializar COM." => {
-                Some(Text::UiaComUnavailable)
-            }
-            "O item focado não oferece uma ação de ativação UI Automation." => {
-                Some(Text::UiaNoActivationAction)
-            }
-            "Item acessível sem nome" => Some(Text::UnnamedItem),
             "Perfil aplicado e salvo para as próximas sessões." => Some(Text::ProfileSaved),
             "Este compositor não permite exibir o teclado próprio sem ativá-lo." => {
                 Some(Text::KeyboardOverlayUnavailable)
@@ -110,16 +79,6 @@ impl Locale {
         }
 
         for (prefix, text) in [
-            ("AT-SPI indisponível: ", Text::AtspiUnavailablePrefix),
-            (
-                "Não foi possível ler a árvore AT-SPI: ",
-                Text::AtspiReadFailedPrefix,
-            ),
-            ("UI Automation indisponível: ", Text::UiaUnavailablePrefix),
-            (
-                "UI Automation não encontrou uma janela acessível: ",
-                Text::UiaWindowFailedPrefix,
-            ),
             ("Erro ao carregar perfil SDL: ", Text::SdlLoadProfilePrefix),
             ("Erro ao ler os perfis: ", Text::SdlReadProfilesPrefix),
             (
@@ -222,7 +181,6 @@ catalog! {
     ControllerPrefix => ("Controller: ", "Control: ", "Controle: ");
     KeyboardActive => ("On-screen keyboard · D-pad moves · A types · R3 closes", "Teclado en pantalla · la cruceta mueve · A escribe · R3 cierra", "Teclado visual próprio · direcional move · A digita · R3 fecha");
     MouseMode => ("Mouse mode · release buttons and center sticks when connecting or resuming", "Modo ratón · suelta los botones y centra los sticks al conectar o reanudar", "Modo mouse · solte os botões e centralize os analógicos ao conectar ou retomar");
-    ItemsMode => ("Item navigation · D-pad or left stick moves focus", "Navegación por elementos · la cruceta o el stick izquierdo mueve el foco", "Navegação por itens · direcional ou analógico esquerdo move o foco");
     Paused => ("Paused · press Start to resume", "En pausa · pulsa Start para reanudar", "Pausado · pressione Start para retomar");
     ConnectGamepad => ("Connect a gamepad. Detection is automatic.", "Conecta un mando. La detección es automática.", "Conecte um gamepad. A detecção é automática.");
     SelectController => ("Select a controller with a profile or import one below.", "Selecciona un mando con perfil o importa uno abajo.", "Selecione um controle com perfil ou importe um abaixo.");
@@ -230,7 +188,6 @@ catalog! {
     KeyboardVisual => ("ON-SCREEN KEYBOARD", "TECLADO EN PANTALLA", "TECLADO VISUAL");
     PausedLabel => ("PAUSED", "EN PAUSA", "PAUSADO");
     MouseLabel => ("MOUSE", "RATÓN", "MOUSE");
-    ItemsLabel => ("ITEMS", "ELEMENTOS", "ITENS");
     DesktopCommands => ("Desktop controls", "Controles del escritorio", "Comandos do desktop");
     KeyboardCommands => ("On-screen keyboard controls", "Controles del teclado en pantalla", "Comandos do teclado visual");
     ButtonPositionNote => ("South, east, west, and north refer to the physical positions of the four face buttons. Escape cancels menus; it is not the browser Back command.", "Sur, este, oeste y norte indican la posición física de los cuatro botones. Escape cancela menús; no es el comando Atrás del navegador.", "Inferior, direito, esquerdo e superior indicam a posição física dos quatro botões. Escape cancela menus; não é o comando Voltar do navegador.");
@@ -279,28 +236,10 @@ catalog! {
     KeyboardTypingHelp => ("A type · B delete · L3 space · R1 Shift · Start settings", "A escribir · B borrar · L3 espacio · R1 Shift · Start ajustes", "A digitar · B apagar · L3 espaço · R1 Shift · Start ajustes");
     KeyboardNavigationHelp => ("X Enter · Y Esc · L1 Tab · R3 close", "X Enter · Y Esc · L1 Tab · R3 cerrar", "X Enter · Y Esc · L1 Tab · R3 fechar");
     Space => ("Space", "Espacio", "Espaço");
-    ItemsEnablePrompt => ("Enable item mode to inspect the accessibility tree.", "Activa el modo de elementos para consultar el árbol de accesibilidad.", "Ative o modo itens para consultar a árvore de acessibilidade.");
-    ReadingItems => ("Reading accessible items in the active window…", "Leyendo elementos accesibles de la ventana activa…", "Lendo os itens acessíveis da janela ativa…");
-    AtspiNoActiveWindow => ("AT-SPI could not find an active window to navigate.", "AT-SPI no encontró una ventana activa para navegar.", "AT-SPI não identificou uma janela ativa para navegar.");
-    NoVisibleAccessibleItems => ("This window exposes no visible interactive accessibility items.", "Esta ventana no expone elementos interactivos visibles mediante accesibilidad.", "Esta janela não expõe itens interativos visíveis pela acessibilidade.");
-    NoItemInDirection => ("There is no other item in that direction.", "No hay otro elemento en esa dirección.", "Não há outro item nessa direção.");
-    FocusRejected => ("The app did not accept focus for this item.", "La aplicación no aceptó el foco de este elemento.", "O aplicativo não aceitou o foco deste item.");
-    NoFocusedItem => ("No item is focused to activate.", "No hay ningún elemento enfocado para activar.", "Nenhum item está focado para ativar.");
-    ItemActivated => ("Item activated.", "Elemento activado.", "Item ativado.");
-    AtspiNoActivationAction => ("The focused item has no AT-SPI activation action.", "El elemento enfocado no ofrece una acción de activación AT-SPI.", "O item focado não oferece uma ação de ativação AT-SPI.");
-    ItemsPaused => ("Item mode paused.", "Modo de elementos en pausa.", "Modo itens pausado.");
-    NoAccessibleItems => ("No accessible items were found.", "No se encontraron elementos accesibles.", "Nenhum item acessível foi encontrado.");
-    UiaComUnavailable => ("UI Automation unavailable: COM could not be initialized.", "UI Automation no está disponible: no se pudo iniciar COM.", "UI Automation indisponível: não foi possível inicializar COM.");
-    UiaNoActivationAction => ("The focused item has no UI Automation activation action.", "El elemento enfocado no ofrece una acción de activación de UI Automation.", "O item focado não oferece uma ação de ativação UI Automation.");
-    UnnamedItem => ("Unnamed accessible item", "Elemento accesible sin nombre", "Item acessível sem nome");
     KeyboardOverlayUnavailable => ("This compositor cannot show the custom keyboard without activating it.", "Este compositor no puede mostrar el teclado propio sin activarlo.", "Este compositor não permite exibir o teclado próprio sem ativá-lo.");
     KeyboardOpened => ("On-screen keyboard · D-pad moves · A types · B deletes · R3 closes.", "Teclado en pantalla · la cruceta mueve · A escribe · B borra · R3 cierra.", "Teclado visual próprio · direcional move · A digita · B apaga · R3 fecha.");
     KeyboardClosed => ("On-screen keyboard closed.", "Teclado en pantalla cerrado.", "Teclado visual fechado.");
     PasteOneSdlMapping => ("Paste one SDL profile line: GUID,name,buttons/axes.", "Pega una línea de perfil SDL: GUID,nombre,botones/ejes.", "Cole uma única linha de perfil SDL: GUID,nome,botões/eixos.");
-    AtspiUnavailablePrefix => ("AT-SPI unavailable: ", "AT-SPI no está disponible: ", "AT-SPI indisponível: ");
-    AtspiReadFailedPrefix => ("Could not read the AT-SPI tree: ", "No se pudo leer el árbol AT-SPI: ", "Não foi possível ler a árvore AT-SPI: ");
-    UiaUnavailablePrefix => ("UI Automation unavailable: ", "UI Automation no está disponible: ", "UI Automation indisponível: ");
-    UiaWindowFailedPrefix => ("UI Automation could not find an accessible window: ", "UI Automation no encontró una ventana accesible: ", "UI Automation não encontrou uma janela acessível: ");
     SdlLoadProfilePrefix => ("Could not load SDL profile: ", "No se pudo cargar el perfil SDL: ", "Erro ao carregar perfil SDL: ");
     SdlReadProfilesPrefix => ("Could not read profiles: ", "No se pudieron leer los perfiles: ", "Erro ao ler os perfis: ");
     ProfileSaveFailedPrefix => ("Profile applied for this session, but could not be saved: ", "Perfil aplicado para esta sesión, pero no se pudo guardar: ", "Perfil aplicado nesta sessão, mas não foi salvo: ");
@@ -322,8 +261,6 @@ catalog! {
     EastButtonShort => ("B / east button", "B / botón este", "B / botão direito");
     WestButtonShort => ("X / west button", "X / botón oeste", "X / botão esquerdo");
     NorthButtonShort => ("Y / north button", "Y / botón norte", "Y / botão superior");
-    DpadOrLeftStick => ("D-pad / left stick", "Cruceta / stick izquierdo", "Direcional / analógico esquerdo");
-    ToggleModes => ("Switch between mouse and item navigation", "Alternar entre ratón y navegación por elementos", "Alternar entre modo mouse e navegação por itens");
     ToggleKeyboard => ("Open / close custom on-screen keyboard", "Abrir / cerrar teclado en pantalla", "Abrir / fechar teclado visual próprio");
     SystemLauncher => ("System launcher · Super / Windows", "Lanzador del sistema · Super / Windows", "Lançador do sistema · Super / Windows");
     MovePointer => ("Move pointer", "Mover el puntero", "Mover ponteiro");
@@ -345,7 +282,4 @@ catalog! {
     InsertTab => ("Insert Tab", "Insertar Tab", "Inserir Tab");
     ToggleShift => ("Toggle Shift", "Activar o desactivar Shift", "Ativar ou desativar Shift");
     CloseKeyboard => ("Close on-screen keyboard", "Cerrar teclado en pantalla", "Fechar o teclado visual");
-    MoveNearbyItems => ("Move focus to a nearby item", "Mover el foco a un elemento cercano", "Mover o foco entre itens próximos");
-    ActivateFocusedItem => ("Activate focused item", "Activar el elemento enfocado", "Ativar o item focado");
-    CancelWithEscape => ("Cancel with Escape", "Cancelar con Escape", "Cancelar com Escape");
 }

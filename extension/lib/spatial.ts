@@ -74,6 +74,18 @@ export function candidates(): HTMLElement[] {
   return candidateRects().map(({ el }) => el);
 }
 
+export function candidateAtPoint(x: number, y: number): HTMLElement | null {
+  const target = document.elementFromPoint(x, y)?.closest<HTMLElement>(SELECTOR);
+  if (!target) return null;
+
+  const rect = visibleRect(target);
+  if (!rect || x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) return null;
+
+  const layer = activeLayer();
+  const keyboard = document.querySelector<HTMLElement>('[data-gamepad-desktop="keyboard"]');
+  return layer && !layer.contains(target) && !keyboard?.contains(target) ? null : target;
+}
+
 export function nearest(current: HTMLElement | null, direction: Direction): HTMLElement | null {
   const keyboard = current?.closest<HTMLElement>('[data-gamepad-desktop="keyboard"]') ?? null;
   const all = candidateRects(keyboard);

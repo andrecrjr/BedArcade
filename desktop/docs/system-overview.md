@@ -5,23 +5,22 @@ O Gamepad Desktop permite controlar a janela ativa com um gamepad. Ele é um apl
 ## A experiência em poucas palavras
 
 1. Conecte um controle e abra o painel do Gamepad Desktop.
-2. Use o modo mouse para apontar e clicar, ou alterne para navegar pelos itens acessíveis da janela.
+2. Use o analógico para apontar, o direcional para enviar setas e os botões para clicar ou enviar atalhos.
 3. Abra o teclado visual quando precisar digitar. Ele envia as teclas ao aplicativo que já estava ativo.
 4. Recolha o painel para a bandeja para continuar usando o controle em segundo plano.
 
-O modo mouse é selecionado ao iniciar. **L2 + R2** alterna entre mouse e navegação por itens. A combinação é ignorada enquanto o teclado visual estiver aberto.
+O analógico esquerdo move o ponteiro e o direcional envia as setas ao aplicativo ativo. Não há navegação por itens acessíveis.
 
 ## Visão do sistema
 
-O controle envia botões e movimentos para o app. O app interpreta cada comando no modo atual e encaminha a ação ao sistema operacional. O painel apresenta o estado e os ajustes; a bandeja permite ocultá-lo sem parar o controle.
+O controle envia botões e movimentos para o app. O app interpreta cada comando e encaminha a ação ao sistema operacional. O painel apresenta o estado e os ajustes; a bandeja permite ocultá-lo sem parar o controle.
 
 ```mermaid
 flowchart TD
   A[Gamepad] --> B[Leitura e identificação]
   B --> C[Interpretação dos comandos]
-  C --> D{Modo ativo}
-  D -->|Mouse| E[Mover, clicar, rolar e enviar atalhos]
-  D -->|Itens| F[Consultar itens acessíveis e mover o foco]
+  C -->|Analógicos e A/B| E[Mover, clicar e rolar]
+  C -->|Direcional e X/Y| F[Enviar setas, Enter e Escape]
   C -->|R3| G[Teclado visual sem roubar o foco]
   E --> H[Janela ativa]
   F --> H
@@ -35,27 +34,20 @@ flowchart TD
 | Parte               | O que faz                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------------ |
 | Leitura do controle | Detecta controles conectados, botões e analógicos. Reconecta quando um dispositivo é removido.         |
-| Interpretação       | Converte o estado do controle em movimento, navegação, clique, rolagem, teclas e comandos de pausa.    |
-| Modo mouse          | Controla o ponteiro, clique esquerdo e direito, arrasto, rolagem e alguns atalhos do sistema.          |
-| Modo itens          | Encontra o próximo item acessível na direção escolhida, move o foco e tenta ativar ou cancelar a ação. |
+| Interpretação       | Converte o estado do controle em movimento, cliques, rolagem, teclas e comandos de pausa.              |
+| Mouse e teclado     | Controla o ponteiro, cliques, arrasto, rolagem, setas e atalhos do sistema.                             |
 | Teclado visual      | Mostra um teclado controlado pelo gamepad e envia cada tecla para o aplicativo ativo.                  |
 | Painel e bandeja    | Mostra o estado, permite ajustar o app e mantém o controle em execução quando o painel é recolhido.    |
 
-No código, esses fluxos se concentram em `src/gamepads.rs`, `src/control.rs`, `src/runtime.rs`, `src/item_navigation.rs`, `src/keyboard.rs`, `src/linux.rs`, `src/windows.rs`, `src/main.rs` e `src/tray.rs`.
+No código, esses fluxos se concentram em `src/gamepads.rs`, `src/control.rs`, `src/runtime.rs`, `src/keyboard.rs`, `src/linux.rs`, `src/windows.rs`, `src/main.rs` e `src/tray.rs`.
 
-## Os três modos
+## Mouse e teclado
 
 ### Mouse
 
-O analógico esquerdo move o ponteiro. O analógico direito rola a página; o direcional envia setas. Os botões também oferecem clique, arrasto, clique direito, Enter, Escape, Tab e alternância de janela.
+O analógico esquerdo move o ponteiro e o direito rola a página. A oferece clique e arrasto; B oferece clique direito. O direcional envia setas, X envia Enter e Y envia Escape. L3 envia Super/Windows, L1 envia Tab e R1 alterna janelas.
 
 A velocidade do ponteiro e a zona morta podem ser ajustadas no painel. Esses ajustes valem para a sessão.
-
-### Navegação por itens
-
-Pressione **L2 + R2** para entrar nesse modo. O direcional ou o analógico esquerdo move o foco para um item próximo na direção escolhida. O app ignora itens ocultos, desabilitados ou que não possam receber foco e tenta manter o item atual visível. O botão esquerdo confirma a ação acessível; o botão superior envia Escape.
-
-Esse modo usa as informações de acessibilidade fornecidas pela janela ativa. Um aplicativo pode expor a árvore de forma incompleta, não oferecer uma ação para determinado item ou não disponibilizar a árvore. O painel indica quando não há itens navegáveis; nesse caso, volte ao modo mouse com **L2 + R2**.
 
 ### Teclado visual
 
@@ -71,21 +63,20 @@ O teclado também tem ajustes próprios: largura, posição, opacidade e repeti�
 
 Os rótulos abaixo descrevem também as posições físicas dos quatro botões frontais. O painel mostra os nomes correspondentes para Xbox, PlayStation e Switch.
 
-| Comando                        | Mouse                                  | Itens                   |
-| ------------------------------ | -------------------------------------- | ----------------------- |
-| Analógico esquerdo             | Mover ponteiro                         | Mover foco              |
-| Analógico direito, cima/baixo  | Rolar                                  | Rolar quando disponível |
-| Direcional                     | Setas                                  | Mover foco              |
-| Inferior — A / ✕ / B no Switch | Clique esquerdo, segurar para arrastar | —                       |
-| Direito — B / ○ / A no Switch  | Clique direito                         | —                       |
-| Esquerdo — X / □ / Y no Switch | Enter                                  | Ativar item focado      |
-| Superior — Y / △ / X no Switch | Escape                                 | Cancelar com Escape     |
-| L2 + R2                        | Alternar modo                          | Alternar modo           |
-| R3                             | Abrir ou fechar teclado                | Abrir ou fechar teclado |
-| L3                             | Super / tecla Windows                  | Super / tecla Windows   |
-| LB / L1                        | Tab                                    | Tab                     |
-| RB / R1                        | Alt+Tab                                | Alt+Tab                 |
-| Start / Menu / +               | Pausar ou retomar                      | Pausar ou retomar       |
+| Comando                        | Ação                                   |
+| ------------------------------ | -------------------------------------- |
+| Analógico esquerdo             | Mover ponteiro                         |
+| Analógico direito, cima/baixo  | Rolar                                  |
+| Direcional                     | Enviar setas; segurar para repetir      |
+| Inferior — A / ✕ / B no Switch | Clique esquerdo; segurar para arrastar |
+| Direito — B / ○ / A no Switch  | Clique direito                         |
+| Esquerdo — X / □ / Y no Switch | Enter                                   |
+| Superior — Y / △ / X no Switch | Escape                                  |
+| R3                             | Abrir ou fechar teclado                |
+| L3                             | Super / tecla Windows                  |
+| LB / L1                        | Tab                                    |
+| RB / R1                        | Alt+Tab                                |
+| Start / Menu / +               | Pausar ou retomar                      |
 
 No teclado visual, o botão inferior digita a tecla selecionada; o direito apaga; o esquerdo envia Enter; o superior envia Escape; L3 envia espaço; L1 envia Tab; R1 alterna Shift.
 
@@ -107,19 +98,19 @@ Fechar ou recolher o painel mantém o controle funcionando na bandeja, perto do 
 
 ## Integração com cada sistema
 
-| Sistema       | Acessibilidade                | Ponteiro e teclas                                                    | Teclado visual                                                             |
-| ------------- | ----------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Windows       | UI Automation                 | Entrada nativa do Windows                                            | Janela transparente, sempre no topo, sem ativação e com cliques repassados |
-| Linux/X11     | AT-SPI                        | Dispositivos virtuais de entrada                                     | Janela transparente, sem ativação e com cliques repassados                 |
-| Linux/Wayland | AT-SPI, conforme o aplicativo | Dispositivos virtuais de entrada, sujeitos a permissões e compositor | Camada `wlr-layer-shell`, sem foco de teclado e sem região de mouse        |
+| Sistema       | Ponteiro e teclas                                                    | Teclado visual                                                             |
+| ------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Windows       | Entrada nativa do Windows                                            | Janela transparente, sempre no topo, sem ativação e com cliques repassados |
+| Linux/X11     | Dispositivos virtuais de entrada                                     | Janela transparente, sem ativação e com cliques repassados                 |
+| Linux/Wayland | Dispositivos virtuais, sujeitos a permissões e ao compositor         | Camada `wlr-layer-shell`, sem foco de teclado e sem região de mouse        |
 
 ### Windows
 
-O modo itens usa a árvore UI Automation da janela focada. A cobertura depende do que o programa publica. O Windows pode bloquear entrada enviada a aplicativos executados com privilégios mais altos que o Gamepad Desktop.
+O Windows pode bloquear entrada enviada a aplicativos executados com privilégios mais altos que o Gamepad Desktop.
 
 ### Linux
 
-O modo itens usa AT-SPI. O modo mouse e o envio de teclas usam `uinput`, que depende do acesso aos dispositivos de entrada e a `/dev/uinput`. O app não altera essas permissões automaticamente.
+O mouse e o envio de teclas usam `uinput`, que depende do acesso aos dispositivos de entrada e a `/dev/uinput`. O app não altera essas permissões automaticamente. No Linux, AT-SPI também pode informar a posição do campo focado para posicionar o teclado visual.
 
 Em Wayland, o teclado visual requer que o compositor ofereça `wlr-layer-shell`. O GNOME Wayland não oferece esse protocolo, então o app informa que o teclado visual não está disponível. Alguns aplicativos não publicam coordenadas globais confiáveis; nesses casos o teclado usa a posição manual escolhida no painel.
 
@@ -149,8 +140,8 @@ Os arquivos PPM gerados vão para `/tmp/gamepad-keyboard-preview`.
 
 ## Estado e limites conhecidos
 
-- Os modos mouse, itens e teclado visual estão implementados. A navegação por itens e o teclado precisam de validação física em Windows 11, Linux/X11 e outros compositores Wayland.
-- Ainda não há uma matriz publicada de compatibilidade por aplicativo. A disponibilidade de foco, itens, ações e coordenadas depende de cada programa.
+- Mouse, entrada por teclado e teclado visual estão implementados. Ainda precisam de validação física em Windows 11, Linux/X11 e outros compositores Wayland.
+- O suporte às setas depende do aplicativo ativo. Ainda não há uma matriz publicada de compatibilidade por aplicativo.
 - O teclado tem desenho QWERTY ANSI. No Linux, layouts diferentes podem produzir símbolos diferentes e o suporte a caracteres acentuados ainda precisa ser validado.
 - O teclado visual em Wayland não está disponível em compositores sem `wlr-layer-shell`.
 - Os pacotes Windows e Linux x64 são anexados às releases do Gamepad Desktop. O build não substitui a validação com controle físico em cada sistema.
@@ -164,7 +155,6 @@ Os arquivos PPM gerados vão para `/tmp/gamepad-keyboard-preview`.
 | `src/gamepads.rs`                           | Detecção, seleção e perfis dos controles             |
 | `src/control.rs`                            | Mapeamento dos botões e analógicos para comandos     |
 | `src/runtime.rs`                            | Loop de controle que continua ativo em segundo plano |
-| `src/item_navigation.rs`                    | Navegação pela árvore de acessibilidade              |
 | `src/focused_input.rs` e `src/placement.rs` | Geometria do campo focado e posição do teclado       |
 | `src/keyboard.rs`                           | Teclas, ajustes e estado de digitação                |
 | `src/linux.rs` e `src/windows.rs`           | Integração específica com os sistemas                |

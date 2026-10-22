@@ -1,4 +1,4 @@
-import { candidates, nearest, type Direction } from '../lib/spatial';
+import { candidateAtPoint, candidates, nearest, type Direction } from '../lib/spatial';
 import { startGamepadController } from '../lib/gamepad';
 import { attachFloatingKeyboard, hideFloatingKeyboard, submitForm } from '../lib/floating-keyboard';
 import { setActiveGamepadId } from '../lib/gamepad-icons';
@@ -101,16 +101,20 @@ export default defineContentScript({
         return;
       }
       const r = selected.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0 || r.bottom < 0 || r.top > innerHeight) {
+      const left = Math.max(0, r.left - 4);
+      const top = Math.max(0, r.top - 4);
+      const right = Math.min(innerWidth, r.right + 4);
+      const bottom = Math.min(innerHeight, r.bottom + 4);
+      if (right <= left || bottom <= top) {
         outline.style.display = 'none';
         return;
       }
       Object.assign(outline.style, {
         display: 'block',
-        left: `${r.left - 4}px`,
-        top: `${r.top - 4}px`,
-        width: `${r.width + 8}px`,
-        height: `${r.height + 8}px`,
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${right - left}px`,
+        height: `${bottom - top}px`,
       });
     }
 
@@ -129,9 +133,19 @@ export default defineContentScript({
       }
     });
 
+    document.addEventListener(
+      'pointermove',
+      (event) => {
+        if (event.pointerType !== 'mouse') return;
+        const target = candidateAtPoint(event.clientX, event.clientY);
+        if (!target || target === selected) return;
+        selected = target;
+        draw();
+      },
+      { passive: true },
+    );
+
     function move(direction: Direction): boolean {
-      if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
-        selected = document.activeElement;
       if (activeSelectPicker?.open) {
         const target = nearest(selected, direction);
         if (target) {
@@ -195,10 +209,16 @@ export default defineContentScript({
       if (target instanceof HTMLSelectElement && target.isConnected) openSelectPicker(target);
     }
 
-    selected = candidates()[0] ?? null;
+    selected =
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body &&
+      document.activeElement !== document.documentElement
+        ? document.activeElement
+        : (candidates()[0] ?? null);
     window.addEventListener('scroll', draw, { passive: true });
     window.addEventListener('resize', draw);
     const stopGamepad = startGamepadController({
+      moveWithLeftStick: false,
       onAction(action) {
         let outlineUpdated = false;
         if (action.type === 'move') outlineUpdated = move(action.direction);

@@ -359,8 +359,13 @@ test('moves focus and activates controls across supported sites', async ({ page 
     await page.goto(url);
     await connectPad(page);
 
-    const axes = url.startsWith('https:') ? [0.8, 0, 0, 0] : [0, 0, 0, 0];
-    await sendFrame(page, makeFrame(url.startsWith('https:') ? [] : [15], axes));
+    const outline = page.locator('[data-gamepad-desktop="outline"]');
+    await sendFrame(page, makeFrame([], [0.8, 0, 0, 0]), true);
+    await expect
+      .poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().left)))
+      .toBe(16);
+    await sendFrame(page, makeFrame(), true);
+    await sendFrame(page, makeFrame([15]), true);
     await expect(page.locator('#east')).toBeFocused();
     await sendFrame(page, makeFrame(), true);
 
@@ -368,6 +373,31 @@ test('moves focus and activates controls across supported sites', async ({ page 
     await expect(page.locator('body')).toHaveAttribute('data-activated', 'east');
     await sendFrame(page, makeFrame(), true);
   }
+});
+
+test('follows the mouse highlight without taking focus and lets D-pad navigate away', async ({
+  page,
+}) => {
+  await page.goto('https://alpha.test/controls');
+  await connectPad(page);
+
+  const outline = page.locator('[data-gamepad-desktop="outline"]');
+  await page.mouse.move(250, 40);
+  await expect
+    .poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().left)))
+    .toBe(216);
+  await expect(page.locator('#east')).not.toBeFocused();
+
+  await page.mouse.move(500, 200);
+  await expect
+    .poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().left)))
+    .toBe(216);
+
+  await sendFrame(page, makeFrame([14]), true);
+  await expect(page.locator('#first')).toBeFocused();
+  await expect
+    .poll(() => outline.evaluate((element) => Math.round(element.getBoundingClientRect().left)))
+    .toBe(16);
 });
 
 test('keeps directional focus inside an open native dialog', async ({ page }) => {
