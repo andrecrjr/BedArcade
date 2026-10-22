@@ -145,10 +145,37 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
         }
     };
     let mut pending_preferences: Option<(DesktopPreferences, Instant)> = None;
+    let mut preference_save: Option<(DesktopPreferences, JoinHandle<Result<(), String>>)> = None;
     let mut last_tick = Instant::now();
     let outcome = (|| {
         while !stop.load(Ordering::Relaxed) {
             let now = Instant::now();
+            if let Some((preferences, worker)) = preference_save.take() {
+                if worker.is_finished() {
+                    match worker.join() {
+                        Ok(Ok(())) => {
+                            saved_preferences = preferences;
+                            state.lock().expect("runtime state lock").preferences_error = None;
+                        }
+                        Ok(Err(error)) => {
+                            state.lock().expect("runtime state lock").preferences_error =
+                                Some(error);
+                            if pending_preferences.is_none() {
+                                pending_preferences = Some((preferences, now));
+                            }
+                        }
+                        Err(_) => {
+                            state.lock().expect("runtime state lock").preferences_error =
+                                Some("Preference save worker stopped unexpectedly".to_owned());
+                            if pending_preferences.is_none() {
+                                pending_preferences = Some((preferences, now));
+                            }
+                        }
+                    }
+                } else {
+                    preference_save = Some((preferences, worker));
+                }
+            }
             let (selected, mapping) = {
                 let mut state = state.lock().expect("runtime state lock");
                 (state.selected, state.pending_mapping.take())
@@ -249,22 +276,12 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
             {
                 pending_preferences = Some((preferences, now));
             }
-            if let Some((pending, changed_at)) = pending_preferences
+            if preference_save.is_none()
+                && let Some((pending, changed_at)) = pending_preferences
                 && now.duration_since(changed_at) >= Duration::from_millis(750)
             {
-                let save_result = pending.save();
-                let mut runtime_state = state.lock().expect("runtime state lock");
-                match save_result {
-                    Ok(()) => {
-                        saved_preferences = pending;
-                        pending_preferences = None;
-                        runtime_state.preferences_error = None;
-                    }
-                    Err(error) => {
-                        runtime_state.preferences_error = Some(error);
-                        pending_preferences = Some((pending, now));
-                    }
-                }
+                preference_save = Some((pending, thread::spawn(move || pending.save())));
+                pending_preferences = None;
             }
             if let Err(error) = platform.update_keyboard_overlay(&controller.keyboard) {
                 controller.keyboard.open = false;
@@ -288,6 +305,9 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
         if !matches!(action, Action::OnScreenKeyboard(_)) {
             let _ = platform.apply(action);
         }
+    }
+    if let Some((_, worker)) = preference_save {
+        let _ = worker.join();
     }
     let _ = platform.update_keyboard_overlay(&controller.keyboard);
     if controller.keyboard.settings != saved_settings {
