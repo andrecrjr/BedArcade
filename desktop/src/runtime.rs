@@ -17,6 +17,9 @@ use crate::{
     preferences::DesktopPreferences,
 };
 
+const ACTIVE_POLL_INTERVAL: Duration = Duration::from_millis(8);
+const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(16);
+
 #[derive(Clone, Default)]
 pub struct RuntimeState {
     pub locale: Locale,
@@ -196,9 +199,9 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
             let actions = {
                 controller.keyboard.focused_input = input_tracker.latest();
                 let mut state = state.lock().expect("runtime state lock");
-                state.controller = gamepads.name();
-                state.devices = gamepads.devices.clone();
-                state.ready = true;
+                update_gamepad_state(&mut state, frame.is_some(), &gamepads.devices, || {
+                    gamepads.name()
+                });
                 update_control(
                     &mut state,
                     &mut controller,
@@ -297,7 +300,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                         Some(format!("Não foi possível salvar ajustes: {error}"));
                 }
             }
-            thread::sleep(Duration::from_millis(8));
+            thread::sleep(poll_interval(frame.is_some()));
         }
         Ok(())
     })();
@@ -316,6 +319,44 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     outcome
 }
 
+fn update_gamepad_state(
+    state: &mut RuntimeState,
+    connected: bool,
+    devices: &[GamepadInfo],
+    name: impl FnOnce() -> Option<String>,
+) {
+    if connected {
+        if state.controller.is_none() {
+            state.controller = name();
+        }
+    } else {
+        state.controller = None;
+    }
+    if !same_devices(&state.devices, devices) {
+        state.devices.clear();
+        state.devices.extend_from_slice(devices);
+    }
+    state.ready = true;
+}
+
+fn same_devices(left: &[GamepadInfo], right: &[GamepadInfo]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.id == right.id
+                && left.name == right.name
+                && left.guid == right.guid
+                && left.mapped == right.mapped
+        })
+}
+
+fn poll_interval(connected: bool) -> Duration {
+    if connected {
+        ACTIVE_POLL_INTERVAL
+    } else {
+        IDLE_POLL_INTERVAL
+    }
+}
+
 fn update_control(
     state: &mut RuntimeState,
     controller: &mut MouseController,
@@ -326,8 +367,14 @@ fn update_control(
     controller.keyboard.locale = state.locale;
     let actions = controller.update(frame, elapsed, &mut state.settings);
     state.mode = controller.mode;
-    state.keyboard = controller.keyboard.clone();
+    publish_keyboard_state(&mut state.keyboard, &controller.keyboard);
     actions
+}
+
+fn publish_keyboard_state(state: &mut KeyboardSession, keyboard: &KeyboardSession) {
+    if *state != *keyboard {
+        state.clone_from(keyboard);
+    }
 }
 
 #[cfg(test)]
@@ -349,5 +396,109 @@ mod tests {
         assert_eq!(actions, vec![Action::OnScreenKeyboard(true)]);
         assert!(state.keyboard.open);
         assert!(controller.keyboard.open);
+    }
+
+    #[test]
+    fn runtime_keeps_the_active_poll_rate_and_backs_off_when_disconnected() {
+        assert_eq!(poll_interval(true), Duration::from_millis(8));
+        assert_eq!(poll_interval(false), Duration::from_millis(16));
+    }
+
+    #[test]
+    fn unchanged_gamepad_snapshot_does_not_recreate_the_name_or_device_list() {
+        let devices = vec![GamepadInfo {
+            id: 7,
+            name: "Virtual controller".to_owned(),
+            guid: "0123456789abcdef0123456789abcdef".to_owned(),
+            mapped: true,
+        }];
+        let mut state = RuntimeState::default();
+        let mut name_reads = 0;
+
+        update_gamepad_state(&mut state, true, &devices, || {
+            name_reads += 1;
+            Some("Virtual controller".to_owned())
+        });
+        update_gamepad_state(&mut state, true, &devices, || {
+            name_reads += 1;
+            Some("Virtual controller".to_owned())
+        });
+
+        assert_eq!(name_reads, 1);
+        assert_eq!(state.controller.as_deref(), Some("Virtual controller"));
+        assert!(same_devices(&state.devices, &devices));
+        assert!(state.ready);
+    }
+
+    #[test]
+    #[ignore = "manual benchmark comparing unchanged runtime-state copies"]
+    fn runtime_state_copy_benchmark() {
+        use std::hint::black_box;
+
+        const ITERATIONS: usize = 200_000;
+        let mut keyboard = KeyboardSession::default();
+        keyboard.status = Some("Keyboard ready".to_owned());
+        for device_count in [1, 4] {
+            let devices: Vec<_> = (0..device_count)
+                .map(|id| GamepadInfo {
+                    id,
+                    name: format!("Virtual controller {id}"),
+                    guid: format!("{id:032x}"),
+                    mapped: true,
+                })
+                .collect();
+            let mut initial = RuntimeState {
+                controller: Some("Virtual controller 0".to_owned()),
+                devices: devices.clone(),
+                keyboard: keyboard.clone(),
+                ..RuntimeState::default()
+            };
+            let name = "Virtual controller 0";
+
+            let baseline_started = Instant::now();
+            for _ in 0..ITERATIONS {
+                initial.controller = Some(name.to_owned());
+                initial.devices = devices.clone();
+                initial.keyboard = keyboard.clone();
+                black_box(&initial);
+            }
+            let baseline_ns = baseline_started.elapsed().as_nanos() as f64 / ITERATIONS as f64;
+
+            let mut optimized = RuntimeState {
+                controller: Some(name.to_owned()),
+                devices: devices.clone(),
+                keyboard: keyboard.clone(),
+                ..RuntimeState::default()
+            };
+            let optimized_started = Instant::now();
+            for _ in 0..ITERATIONS {
+                update_gamepad_state(&mut optimized, true, &devices, || Some(name.to_owned()));
+                publish_keyboard_state(&mut optimized.keyboard, &keyboard);
+                black_box(&optimized);
+            }
+            let optimized_ns = optimized_started.elapsed().as_nanos() as f64 / ITERATIONS as f64;
+
+            let baseline_ui_started = Instant::now();
+            for _ in 0..ITERATIONS {
+                let first = initial.clone();
+                black_box((first.locale, first.keyboard));
+                black_box(initial.clone());
+            }
+            let baseline_ui_ns =
+                baseline_ui_started.elapsed().as_nanos() as f64 / ITERATIONS as f64;
+
+            let optimized_ui_started = Instant::now();
+            for _ in 0..ITERATIONS {
+                let snapshot = optimized.clone();
+                black_box((snapshot.locale, snapshot.keyboard.clone()));
+                black_box(snapshot);
+            }
+            let optimized_ui_ns =
+                optimized_ui_started.elapsed().as_nanos() as f64 / ITERATIONS as f64;
+
+            eprintln!(
+                "devices={device_count} tick_ns baseline={baseline_ns:.1} optimized={optimized_ns:.1} ui_ns baseline={baseline_ui_ns:.1} optimized={optimized_ui_ns:.1}"
+            );
+        }
     }
 }

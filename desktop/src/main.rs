@@ -60,9 +60,9 @@ impl eframe::App for GamepadDesktopApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         handle_panel_close(ui.ctx(), &self.panel, self.tray_error.is_none());
         ui.ctx().request_repaint_after(Duration::from_millis(50));
-        let state = self.desktop.lock().expect("desktop runtime lock").state();
+        let mut state = self.desktop.lock().expect("desktop runtime lock").state();
         let locale = state.locale;
-        let keyboard = state.keyboard;
+        let keyboard = state.keyboard.clone();
         if keyboard.presentation == KeyboardPresentation::Viewport {
             show_keyboard_viewport(ui, keyboard, cfg!(target_os = "windows"));
         }
@@ -75,7 +75,6 @@ impl eframe::App for GamepadDesktopApp {
         });
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                let mut state = self.desktop.lock().expect("desktop runtime lock").state();
                 let desktop = &self.desktop;
                 let panel = &self.panel;
                 let tray_error = self.tray_error.as_deref();
