@@ -1,3 +1,15 @@
+## [0.3.1](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.3.0...desktop-v0.3.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* sync website focus with mouse ([fecd573](https://github.com/andrecrjr/GamepadDesktop/commit/fecd573a24ea6f4bc494daf9536e1621d2a7d7a2))
+
+
+### Performance Improvements
+
+* **desktop:** reduce idle polling and state cloning ([e2d66bb](https://github.com/andrecrjr/GamepadDesktop/commit/e2d66bbb61ddb9774cb80aa3d3df81c4c50d0dc3))
+
 # [0.3.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.2.0...desktop-v0.3.0) (2026-10-22)
 
 
