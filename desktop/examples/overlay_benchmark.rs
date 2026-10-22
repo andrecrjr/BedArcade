@@ -1,3 +1,5 @@
+#[cfg(all(target_os = "linux", test))]
+use gamepad_desktop::focused_input;
 #[cfg(target_os = "linux")]
 use gamepad_desktop::{keyboard, placement};
 #[cfg(target_os = "linux")]
