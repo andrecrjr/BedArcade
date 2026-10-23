@@ -102,6 +102,10 @@ pub(crate) fn is_native_windows_target(
         return false;
     }
 
+    if image_path.ends_with("/playnite.fullscreenapp.exe") {
+        return true;
+    }
+
     if is_child_path(&image_path, &format!("{windows_directory}/systemapps"))
         || is_child_path(
             &image_path,
