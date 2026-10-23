@@ -1,4 +1,27 @@
 #[derive(Default)]
+pub(crate) struct PausedCursor {
+    hidden: bool,
+}
+
+impl PausedCursor {
+    pub(crate) fn sync<E>(
+        &mut self,
+        enabled: bool,
+        connected: bool,
+        mut apply: impl FnMut(bool) -> Result<(), E>,
+    ) -> Result<(), E> {
+        let hidden = !enabled && connected;
+        if self.hidden != hidden {
+            // A failed hide can have changed some system cursors already.
+            self.hidden = true;
+            apply(hidden)?;
+            self.hidden = hidden;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
 pub(crate) struct NativeDpadTargetCache {
     resolved: Option<((isize, u32), bool)>,
 }
@@ -18,6 +41,16 @@ impl NativeDpadTargetCache {
         self.resolved = active.map(|active| (identity, active));
         active.unwrap_or(false)
     }
+}
+
+pub(crate) fn resolve_native_windows(
+    caches: &mut [NativeDpadTargetCache; 3],
+    windows: [(isize, u32); 3],
+    mut identify: impl FnMut(isize) -> Option<bool>,
+) -> bool {
+    caches.iter_mut().zip(windows).any(|(cache, identity)| {
+        identity.0 != 0 && cache.resolve(identity, || identify(identity.0))
+    })
 }
 
 #[derive(Default)]
@@ -74,6 +107,8 @@ pub(crate) fn is_native_windows_target(
             &image_path,
             &format!("{windows_directory}/immersivecontrolpanel"),
         )
+        || image_path == format!("{windows_directory}/system32/shellhost.exe")
+            && window_class.eq_ignore_ascii_case("ControlCenterWindow")
     {
         return true;
     }
@@ -105,6 +140,117 @@ fn is_child_path(path: &str, directory: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quick_settings_shellhost_does_not_receive_duplicate_directional_repeats() {
+        for (process, windows_directory) in [
+            (r"C:\Windows\System32\ShellHost.exe", r"C:\Windows"),
+            ("d:/WINDOWS/system32/SHELLHOST.EXE", "D:/Windows/"),
+        ] {
+            let mut routing = NativeDpadRouting::default();
+            routing.set_target_active(is_native_windows_target(
+                process,
+                windows_directory,
+                "ControlCenterWindow",
+            ));
+            for _ in 0..10 {
+                assert!(
+                    !routing.should_synthesize(),
+                    "duplicate arrow for {process}"
+                );
+            }
+            routing.release_dpad();
+            assert!(!routing.should_synthesize());
+            routing.release_dpad();
+            routing.set_target_active(false);
+            assert!(
+                routing.should_synthesize(),
+                "ordinary apps still need arrows"
+            );
+        }
+    }
+
+    #[test]
+    fn shellhost_detection_requires_the_system_path_and_panel_class() {
+        for (process, class) in [
+            (r"C:\Other\ShellHost.exe", "ControlCenterWindow"),
+            (r"C:\Windows\System32\Other.exe", "ControlCenterWindow"),
+            (r"C:\Windows\System32\ShellHost.exe", "OtherWindow"),
+        ] {
+            assert!(!is_native_windows_target(process, r"C:\Windows", class));
+        }
+    }
+
+    #[test]
+    fn native_focused_panel_or_foreground_wins_over_non_native_root() {
+        for native in [11, 22, 33] {
+            let mut caches = Default::default();
+            let windows = [(11, 1), (22, 2), (33, 3)];
+            let mut routing = NativeDpadRouting::default();
+            routing.set_target_active(resolve_native_windows(&mut caches, windows, |handle| {
+                Some(handle == native)
+            }));
+            assert!(
+                !routing.should_synthesize(),
+                "native surface {native} was missed"
+            );
+            assert!(!routing.should_synthesize());
+            routing.release_dpad();
+            assert!(!routing.should_synthesize());
+        }
+    }
+
+    #[test]
+    fn paused_cursor_hides_once_and_restores_on_resume_or_disconnect() {
+        let mut cursor = PausedCursor::default();
+        let mut changes = Vec::new();
+        for (enabled, connected) in [
+            (true, true),
+            (false, true),
+            (false, true),
+            (true, true),
+            (false, true),
+            (false, false),
+            (false, false),
+        ] {
+            cursor
+                .sync(enabled, connected, |hidden| {
+                    changes.push(hidden);
+                    Ok::<_, ()>(())
+                })
+                .unwrap();
+        }
+        assert_eq!(changes, [true, false, true, false]);
+    }
+
+    #[test]
+    fn failed_cursor_hide_still_requires_restoration() {
+        let mut cursor = PausedCursor::default();
+        assert!(cursor.sync(false, true, |_| Err("partial hide")).is_err());
+        let mut restored = false;
+        cursor
+            .sync(true, false, |hidden| {
+                restored = !hidden;
+                Ok::<_, ()>(())
+            })
+            .unwrap();
+        assert!(restored);
+    }
+
+    #[test]
+    fn failed_cursor_restore_can_be_retried() {
+        let mut cursor = PausedCursor::default();
+        cursor.sync(false, true, |_| Ok::<_, ()>(())).unwrap();
+        assert!(cursor.sync(true, true, |_| Err(())).is_err());
+        let mut retried = false;
+        cursor
+            .sync(true, true, |hidden| {
+                retried = !hidden;
+                Ok::<_, ()>(())
+            })
+            .unwrap();
+        assert!(retried);
+    }
 
     #[test]
     fn failed_target_lookup_is_retried_and_then_stops_synthetic_dpad() {

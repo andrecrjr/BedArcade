@@ -80,6 +80,10 @@ impl Platform {
 
     pub(crate) fn update_native_dpad_target(&mut self) {}
 
+    pub(crate) fn update_mouse_mode(&mut self, _: bool, _: bool) -> Result<(), String> {
+        Ok(())
+    }
+
     pub(crate) fn take_native_dpad_notice(&mut self) -> bool {
         false
     }

@@ -278,6 +278,10 @@ fn run(
                 notification_service.send(notification);
             }
             last_tick = now;
+            platform.update_mouse_mode(
+                state.lock().expect("runtime state lock").settings.enabled,
+                frame.is_some(),
+            )?;
             platform.update_native_dpad_target();
             for action in actions {
                 match action {

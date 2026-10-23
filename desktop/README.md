@@ -38,6 +38,8 @@ Os nomes e comandos completos aparecem no painel, incluindo os equivalentes de X
 ## O que saber antes de usar
 
 - As setas do direcional são enviadas ao aplicativo ativo; o suporte depende do próprio aplicativo.
+- Nos painéis nativos do Windows, o app verifica a janela ativa, o controle focado e sua janela raiz para evitar duplicar a navegação do direcional. Isso inclui as configurações rápidas hospedadas por `System32\ShellHost.exe` (`ControlCenterWindow`) no Windows 11 recente.
+- No Windows, pausar com Start + Select oculta os cursores padrão enquanto há um controle conectado. Retomar, desconectar o controle ou encerrar normalmente pela bandeja restaura o esquema de cursores. Cursores personalizados de aplicativos podem continuar visíveis. Se o processo for encerrado à força durante a pausa, reaplique o esquema em Configurações do mouse → Ponteiros para restaurá-los.
 - O teclado visual usa o layout QWERTY em inglês. No Linux, símbolos e acentos podem variar conforme o layout ativo.
 - Em algumas sessões Wayland, incluindo o GNOME Wayland, o teclado visual não está disponível.
 - Os pacotes Windows e Linux existem, mas o uso com controle físico ainda precisa de validação em Windows 11, Linux/X11 e Wayland.

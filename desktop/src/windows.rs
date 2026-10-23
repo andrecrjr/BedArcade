@@ -5,7 +5,8 @@ use enigo::{Axis as ScrollAxis, Coordinate, Direction, Enigo, Key, Keyboard, Mou
 use crate::control::{Action, DpadDirection, KeyboardInput, MouseButton, SystemKey};
 use crate::keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession};
 use crate::windows_navigation::{
-    NativeDpadRouting, NativeDpadTargetCache, is_native_windows_target,
+    NativeDpadRouting, NativeDpadTargetCache, PausedCursor, is_native_windows_target,
+    resolve_native_windows,
 };
 use windows::{
     Win32::{
@@ -15,8 +16,11 @@ use windows::{
             QueryFullProcessImageNameW,
         },
         UI::WindowsAndMessaging::{
-            GA_ROOT, GUITHREADINFO, GetAncestor, GetClassNameW, GetForegroundWindow,
-            GetGUIThreadInfo, GetWindowThreadProcessId,
+            CreateCursor, GA_ROOT, GUITHREADINFO, GetAncestor, GetClassNameW, GetForegroundWindow,
+            GetGUIThreadInfo, GetWindowThreadProcessId, OCR_APPSTARTING, OCR_CROSS, OCR_HAND,
+            OCR_HELP, OCR_IBEAM, OCR_NO, OCR_NORMAL, OCR_SIZEALL, OCR_SIZENESW, OCR_SIZENS,
+            OCR_SIZENWSE, OCR_SIZEWE, OCR_UP, OCR_WAIT, SPI_SETCURSORS,
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetSystemCursor, SystemParametersInfoW,
         },
     },
     core::PWSTR,
@@ -27,7 +31,8 @@ const NAVIGATION_TARGET_CHECK_INTERVAL: Duration = Duration::from_millis(50);
 pub struct Platform {
     input: Enigo,
     native_dpad: NativeDpadRouting,
-    target_cache: NativeDpadTargetCache,
+    target_cache: [NativeDpadTargetCache; 3],
+    paused_cursor: PausedCursor,
     last_target_check: Option<Instant>,
 }
 
@@ -37,7 +42,8 @@ impl Platform {
             input: Enigo::new(&Settings::default())
                 .map_err(|error| format!("Falha ao conectar entrada do Windows: {error}"))?,
             native_dpad: NativeDpadRouting::default(),
-            target_cache: NativeDpadTargetCache::default(),
+            target_cache: Default::default(),
+            paused_cursor: PausedCursor::default(),
             last_target_check: None,
         })
     }
@@ -48,6 +54,16 @@ impl Platform {
 
     pub(crate) fn take_native_dpad_notice(&mut self) -> bool {
         self.native_dpad.take_notice()
+    }
+
+    pub(crate) fn update_mouse_mode(
+        &mut self,
+        enabled: bool,
+        connected: bool,
+    ) -> Result<(), String> {
+        self.paused_cursor
+            .sync(enabled, connected, set_cursor_hidden)
+            .map_err(|error| format!("Falha atualizando cursor do Windows: {error}"))
     }
 
     pub fn system_keyboard_uses_gamepad(&self) -> bool {
@@ -76,19 +92,21 @@ impl Platform {
         }
         self.last_target_check = Some(Instant::now());
 
-        let Some(window) = Self::focused_root_window() else {
-            self.target_cache = NativeDpadTargetCache::default();
+        let Some(windows) = Self::navigation_windows() else {
+            self.target_cache = Default::default();
             self.native_dpad.set_target_active(false);
             return;
         };
-        let mut process_id = 0;
-        unsafe {
-            GetWindowThreadProcessId(window, Some(&mut process_id));
-        }
-        let identity = (window.0 as isize, process_id);
-        let active = self
-            .target_cache
-            .resolve(identity, || Self::is_native_system_window(window));
+        let identities = windows.map(|window| {
+            let mut process_id = 0;
+            unsafe {
+                GetWindowThreadProcessId(window, Some(&mut process_id));
+            }
+            (window.0 as isize, process_id)
+        });
+        let active = resolve_native_windows(&mut self.target_cache, identities, |handle| {
+            Self::is_native_system_window(HWND(handle as *mut _))
+        });
         self.native_dpad.set_target_active(active);
     }
 
@@ -238,7 +256,7 @@ impl Platform {
         String::from_utf16_lossy(&name[..length as usize])
     }
 
-    fn focused_root_window() -> Option<HWND> {
+    fn navigation_windows() -> Option<[HWND; 3]> {
         unsafe {
             let foreground = GetForegroundWindow();
             if foreground.is_invalid() {
@@ -255,14 +273,68 @@ impl Platform {
                 .filter(|window| !window.is_invalid())
                 .unwrap_or(foreground);
             let root = GetAncestor(focus, GA_ROOT);
-            Some(if root.is_invalid() { foreground } else { root })
+            Some([
+                foreground,
+                focus,
+                if root.is_invalid() { foreground } else { root },
+            ])
         }
     }
 }
 
 impl Drop for Platform {
     fn drop(&mut self) {
+        let _ = self.update_mouse_mode(true, false);
         let _ = self.input.button(enigo::Button::Left, Direction::Release);
         let _ = self.input.button(enigo::Button::Right, Direction::Release);
     }
+}
+
+// ShowCursor only affects the calling thread's windows. Replace the standard
+// shapes temporarily so the cursor is hidden over other applications as well.
+// No registry changes: restoring reloads the user's configured cursor scheme.
+fn set_cursor_hidden(hidden: bool) -> windows::core::Result<()> {
+    if !hidden {
+        return unsafe {
+            SystemParametersInfoW(
+                SPI_SETCURSORS,
+                0,
+                None,
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            )
+        };
+    }
+    for id in [
+        OCR_NORMAL,
+        OCR_IBEAM,
+        OCR_WAIT,
+        OCR_CROSS,
+        OCR_UP,
+        OCR_SIZENWSE,
+        OCR_SIZENESW,
+        OCR_SIZEWE,
+        OCR_SIZENS,
+        OCR_SIZEALL,
+        OCR_NO,
+        OCR_HAND,
+        OCR_APPSTARTING,
+        OCR_HELP,
+    ] {
+        // Monochrome AND=1, XOR=0 preserves the screen underneath each pixel.
+        let and_mask = [0xff_u8; 128];
+        let xor_mask = [0_u8; 128];
+        unsafe {
+            let cursor = CreateCursor(
+                None,
+                0,
+                0,
+                32,
+                32,
+                and_mask.as_ptr().cast(),
+                xor_mask.as_ptr().cast(),
+            )?;
+            SetSystemCursor(cursor, id)?;
+        }
+    }
+    Ok(())
 }
