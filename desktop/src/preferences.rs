@@ -7,6 +7,7 @@ use crate::{control::ControlSettings, i18n::Locale};
 pub struct DesktopPreferences {
     pub locale: Locale,
     pub controls: ControlSettings,
+    pub start_on_login: bool,
 }
 
 impl Default for DesktopPreferences {
@@ -14,6 +15,7 @@ impl Default for DesktopPreferences {
         Self {
             locale: Locale::detect(),
             controls: ControlSettings::default(),
+            start_on_login: false,
         }
     }
 }

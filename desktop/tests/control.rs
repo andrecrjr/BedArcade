@@ -171,10 +171,18 @@ fn disconnect_releases_buttons_and_reconnect_requires_neutral() {
 }
 
 #[test]
-fn start_pauses_releases_drag_and_does_not_repeat_while_held() {
+fn start_alone_does_not_pause_mouse_controls() {
+    let (mut controller, mut settings) = ready();
+    controller.update(Some(&pressed(Button::Start)), TICK, &mut settings);
+    assert!(settings.enabled);
+}
+
+#[test]
+fn start_and_select_pause_resume_once_and_release_drag() {
     let (mut controller, mut settings) = ready();
     controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
     let mut frame = pressed(Button::Start);
+    frame.buttons[Button::Select as usize] = true;
     frame.buttons[Button::South as usize] = true;
     assert_eq!(
         controller.update(Some(&frame), TICK, &mut settings),
@@ -194,6 +202,11 @@ fn start_pauses_releases_drag_and_does_not_repeat_while_held() {
         controller
             .update(Some(&frame), TICK, &mut settings)
             .is_empty()
+    );
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, true)]
     );
 }
 
@@ -359,7 +372,8 @@ fn pause_and_disconnect_request_system_keyboard_close() {
         let open_actions =
             controller.update(Some(&pressed(Button::RightStick)), TICK, &mut settings);
         assert!(open_actions.contains(&Action::OnScreenKeyboard(true)));
-        let pause = pressed(Button::Start);
+        let mut pause = pressed(Button::Start);
+        pause.buttons[Button::Select as usize] = true;
         let frame = if disconnect { None } else { Some(&pause) };
         let actions = controller.update(frame, TICK, &mut settings);
         assert!(actions.contains(&Action::OnScreenKeyboard(false)));

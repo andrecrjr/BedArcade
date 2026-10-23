@@ -16,7 +16,7 @@ LINUX_PACKAGE_DIR := $(DESKTOP_DIST_DIR)/linux
 
 .PHONY: help dev run build check lint format format-check test \
 	web-install web-dev web-build web-package web-typecheck web-lint web-format web-format-check web-test \
-	desktop-run desktop-build desktop-release desktop-linux desktop-linux-package desktop-windows \
+	desktop-run desktop-build desktop-release desktop-linux desktop-linux-package desktop-windows desktop-packages \
 	desktop-check desktop-lint desktop-format desktop-format-check desktop-test desktop-preview
 
 help:
@@ -34,8 +34,9 @@ help:
 		'  test           Run browser E2E and Rust tests' \
 		'' \
 		'Extension: web-install, web-dev, web-build, web-package, web-typecheck, web-lint, web-format, web-format-check, web-test' \
-		'Desktop:   desktop-run, desktop-build, desktop-release, desktop-linux, desktop-windows, desktop-check, desktop-lint, desktop-format, desktop-format-check, desktop-test, desktop-preview' \
+		'Desktop:   desktop-run, desktop-build, desktop-release, desktop-linux, desktop-linux-package, desktop-windows, desktop-packages, desktop-check, desktop-lint, desktop-format, desktop-format-check, desktop-test, desktop-preview' \
 		'' \
+		'desktop-packages builds Linux and Windows x64 packages into desktop/dist; install the Windows build tools first.' \
 		'desktop-windows builds and packages x64 Windows; install the Rust target, MinGW, CMake, and zip first.'
 
 dev: web-dev
@@ -103,6 +104,8 @@ desktop-windows:
 	mkdir -p $(DESKTOP_DIST_DIR)
 	cp $(WINDOWS_BINARY) $(DESKTOP_DIST_DIR)/gamepad-desktop.exe
 	$(ZIP) -q -j -FS $(WINDOWS_PACKAGE) $(DESKTOP_DIST_DIR)/gamepad-desktop.exe
+
+desktop-packages: desktop-linux-package desktop-windows
 
 desktop-check:
 	$(CARGO) check --manifest-path $(DESKTOP_MANIFEST)

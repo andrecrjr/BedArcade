@@ -33,7 +33,7 @@ pub const MOUSE_SHORTCUTS: &[(&str, &str)] = &[
     ("LB / L1", "Tab · próximo campo"),
     ("RB / R1", "Alt+Tab · alternar janela"),
     (
-        "Start / Menu / +",
+        "Start + Select / Menu + View",
         "Pausar / retomar · solte e centralize para retomar",
     ),
 ];
@@ -69,6 +69,7 @@ pub enum Button {
     RightStick,
     Start,
     LeftStick,
+    Select,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -76,7 +77,7 @@ pub struct GamepadFrame {
     pub x: f64,
     pub y: f64,
     pub scroll: f64,
-    pub buttons: [bool; 13],
+    pub buttons: [bool; 14],
 }
 
 impl GamepadFrame {
@@ -97,7 +98,7 @@ impl Default for ControlSettings {
     fn default() -> Self {
         Self {
             enabled: true,
-            speed: 900.0,
+            speed: 1800.0,
             deadzone: 0.2,
         }
     }
@@ -202,9 +203,12 @@ impl MouseController {
             self.previous = *frame;
             self.connected = true;
         }
+        let pause_chord = frame.pressed(Button::Start) && frame.pressed(Button::Select);
+        let previous_pause_chord =
+            self.previous.pressed(Button::Start) && self.previous.pressed(Button::Select);
         if !(self.keyboard.open && self.system_keyboard_uses_gamepad)
-            && frame.pressed(Button::Start)
-            && !self.previous.pressed(Button::Start)
+            && pause_chord
+            && !previous_pause_chord
         {
             settings.enabled = !settings.enabled;
             self.armed = false;

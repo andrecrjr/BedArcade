@@ -29,6 +29,8 @@ Use strict TypeScript and preserve the existing two-space indentation, single qu
 
 ## Testing Guidelines
 
+Always follow Red → Green for behavior changes: first add a focused test that fails for the missing behavior and run it, then implement the smallest change that makes it pass, and finally run the relevant test suite.
+
 Before submitting, run the relevant extension format, lint, typecheck, and build commands, plus the desktop format, lint, check, and test commands. E2E tests use deterministic standard-mapped input frames and verify focus movement, activation, pause/resume, browser history, and tab switching. Physical controller behavior still needs manual validation; automated extension coverage targets Chromium and standard mappings.
 
 ## Commits and Pull Requests

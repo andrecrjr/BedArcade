@@ -4,6 +4,8 @@ Use o controle para navegar pelo computador, mover o ponteiro e digitar sem tira
 
 O app controla o ponteiro e envia comandos de teclado, além de oferecer um teclado visual próprio. Ele continua funcionando quando o painel é recolhido para a bandeja do sistema.
 
+Notificações do sistema avisam sobre pausa e retomada, conexão do controle e falhas mesmo com o painel recolhido. No Windows, a primeira execução cria o atalho por usuário “Gamepad Desktop” no menu Iniciar para identificar os avisos.
+
 > O desktop está em desenvolvimento. Cada aplicativo interpreta as teclas recebidas à sua maneira, e ainda falta validar o uso com controles físicos em Windows e Linux.
 
 ![Prévia do teclado visual](keyboard-preview.png)
@@ -29,7 +31,7 @@ No Linux, baixe e extraia o [pacote x64](dist/GamepadDesktop-Linux-x64.tar.gz). 
 | LB / L1                               | Tab                                                      |
 | RB / R1                               | Alt+Tab                                                  |
 | R3 — pressionar o analógico direito   | Abrir ou fechar o teclado visual                        |
-| Start / Menu / +                      | Pausar ou retomar                                       |
+| Start + Select / Menu + View          | Pausar ou retomar; solte os botões e centralize para retomar |
 
 Os nomes e comandos completos aparecem no painel, incluindo os equivalentes de Xbox, PlayStation e Switch. A seção de ajustes permite escolher o controle, ajustar velocidade e personalizar o teclado.
 

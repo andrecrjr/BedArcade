@@ -5,3 +5,5 @@ playwright-report/
 test-results/
 desktop/target/
 desktop/dist/
+.claude/
+.codex-attachments/

@@ -12,6 +12,7 @@ use crate::{
     gamepads::{GamepadInfo, Gamepads},
     i18n::Locale,
     keyboard::{KeyboardSession, KeyboardSettings},
+    notifications::{Notification, NotificationService},
     platform::Platform,
     preferences::DesktopPreferences,
 };
@@ -23,6 +24,7 @@ const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(16);
 pub struct RuntimeState {
     pub locale: Locale,
     pub settings: ControlSettings,
+    pub start_on_login: bool,
     pub controller: Option<String>,
     pub error: Option<String>,
     pub ready: bool,
@@ -38,33 +40,47 @@ pub struct DesktopRuntime {
     state: Arc<Mutex<RuntimeState>>,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<()>>,
+    notifications: NotificationService,
 }
 
 impl Default for DesktopRuntime {
     fn default() -> Self {
         let preferences = DesktopPreferences::load();
+        let startup_error = crate::startup::set_enabled(preferences.start_on_login).err();
         let initial = RuntimeState {
             locale: preferences.locale,
             settings: preferences.controls,
+            start_on_login: preferences.start_on_login,
+            preferences_error: startup_error,
             keyboard: KeyboardSession::with_locale(preferences.locale, KeyboardSettings::load()),
             ..RuntimeState::default()
         };
         let state = Arc::new(Mutex::new(initial));
         let stop = Arc::new(AtomicBool::new(false));
+        let notifications = NotificationService::new();
         let worker_state = Arc::clone(&state);
         let worker_stop = Arc::clone(&stop);
+        let worker_notifications = notifications.clone();
         let worker = thread::spawn(move || {
-            if let Err(error) = run(&worker_state, &worker_stop) {
-                let mut state = worker_state.lock().expect("runtime state lock");
-                state.error = Some(error);
-                state.ready = false;
-                state.keyboard.open = false;
+            if let Err(error) = run(&worker_state, &worker_stop, &worker_notifications) {
+                let locale = {
+                    let mut state = worker_state.lock().expect("runtime state lock");
+                    state.error = Some(error.clone());
+                    state.ready = false;
+                    state.keyboard.open = false;
+                    state.locale
+                };
+                worker_notifications.send(Notification::RuntimeFailure {
+                    locale,
+                    detail: error,
+                });
             }
         });
         Self {
             state,
             stop,
             worker: Some(worker),
+            notifications,
         }
     }
 }
@@ -75,7 +91,17 @@ impl DesktopRuntime {
     }
 
     pub fn configure(&self, settings: ControlSettings) {
-        self.state.lock().expect("runtime state lock").settings = settings;
+        let mut state = self.state.lock().expect("runtime state lock");
+        let enabled_changed = state.settings.enabled != settings.enabled;
+        let locale = state.locale;
+        state.settings = settings;
+        drop(state);
+        if enabled_changed {
+            self.notifications.send(Notification::ControlState {
+                enabled: settings.enabled,
+                locale,
+            });
+        }
     }
 
     pub fn configure_keyboard(&self, settings: KeyboardSettings) {
@@ -97,8 +123,25 @@ impl DesktopRuntime {
         DesktopPreferences {
             locale: state.locale,
             controls: state.settings,
+            start_on_login: state.start_on_login,
         }
         .save()
+    }
+
+    pub fn configure_start_on_login(&self, enabled: bool) -> Result<(), String> {
+        let result = crate::startup::set_enabled(enabled);
+        let mut state = self.state.lock().expect("runtime state lock");
+        match result {
+            Ok(()) => {
+                state.start_on_login = enabled;
+                state.preferences_error = None;
+                Ok(())
+            }
+            Err(error) => {
+                state.preferences_error = Some(error.clone());
+                Err(error)
+            }
+        }
     }
 
     pub fn select_controller(&self, selected: Option<u32>) {
@@ -123,8 +166,12 @@ impl Drop for DesktopRuntime {
     }
 }
 
-fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
-    let input_tracker = crate::focused_input::InputTracker::default();
+fn run(
+    state: &Mutex<RuntimeState>,
+    stop: &AtomicBool,
+    notification_service: &NotificationService,
+) -> Result<(), String> {
+    let mut input_tracker = None;
     let mut platform = Platform::new()?;
     let mut gamepads = Gamepads::new().map_err(|error| format!("SDL3: {error}"))?;
     state.lock().expect("runtime state lock").mapping_message = gamepads.warning.take();
@@ -141,6 +188,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
         DesktopPreferences {
             locale: state.locale,
             controls: state.settings,
+            start_on_login: state.start_on_login,
         }
     };
     let mut pending_preferences: Option<(DesktopPreferences, Instant)> = None;
@@ -192,19 +240,43 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
             } else {
                 gamepads.poll(selected)?
             };
-            let actions = {
-                controller.keyboard.focused_input = input_tracker.latest();
+            let (actions, notifications) = {
+                sync_input_tracker(
+                    &mut input_tracker,
+                    controller.keyboard.open,
+                    crate::focused_input::InputTracker::default,
+                );
+                controller.keyboard.focused_input = input_tracker
+                    .as_ref()
+                    .and_then(crate::focused_input::InputTracker::latest);
                 let mut state = state.lock().expect("runtime state lock");
-                update_gamepad_state(&mut state, frame.is_some(), &gamepads.devices, || {
-                    gamepads.name()
-                });
-                update_control(
+                let locale = state.locale;
+                let enabled_before = state.settings.enabled;
+                let mut notifications = update_gamepad_state(
+                    &mut state,
+                    frame.is_some(),
+                    &gamepads.devices,
+                    || gamepads.name(),
+                    enabled_before,
+                    locale,
+                );
+                let actions = update_control(
                     &mut state,
                     &mut controller,
                     frame.as_ref(),
                     now.duration_since(last_tick),
-                )
+                );
+                if state.settings.enabled != enabled_before {
+                    notifications.push(Notification::ControlState {
+                        enabled: state.settings.enabled,
+                        locale,
+                    });
+                }
+                (actions, notifications)
             };
+            for notification in notifications {
+                notification_service.send(notification);
+            }
             last_tick = now;
             for action in actions {
                 match action {
@@ -227,6 +299,16 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                         }
                         let mut runtime_state = state.lock().expect("runtime state lock");
                         runtime_state.keyboard = controller.keyboard.clone();
+                        let locale = runtime_state.locale;
+                        let detail = controller.keyboard.status.clone();
+                        drop(runtime_state);
+                        if open
+                            && controller.keyboard.presentation
+                                == crate::keyboard::KeyboardPresentation::Unavailable
+                        {
+                            notification_service
+                                .send(Notification::KeyboardUnavailable { locale, detail });
+                        }
                     }
                     action => platform.apply(action)?,
                 }
@@ -236,6 +318,7 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                 DesktopPreferences {
                     locale: state.locale,
                     controls: state.settings,
+                    start_on_login: state.start_on_login,
                 }
             };
             if preferences == saved_preferences {
@@ -254,11 +337,21 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
                 pending_preferences = None;
             }
             if let Err(error) = platform.update_keyboard_overlay(&controller.keyboard) {
+                let was_open = controller.keyboard.open;
                 controller.keyboard.open = false;
                 controller.keyboard.presentation =
                     crate::keyboard::KeyboardPresentation::Unavailable;
                 controller.keyboard.status = Some(error);
-                state.lock().expect("runtime state lock").keyboard = controller.keyboard.clone();
+                let mut runtime_state = state.lock().expect("runtime state lock");
+                runtime_state.keyboard = controller.keyboard.clone();
+                let locale = runtime_state.locale;
+                drop(runtime_state);
+                if was_open {
+                    notification_service.send(Notification::KeyboardUnavailable {
+                        locale,
+                        detail: controller.keyboard.status.clone(),
+                    });
+                }
             }
             if !controller.keyboard.customizing && controller.keyboard.settings != saved_settings {
                 saved_settings = controller.keyboard.settings;
@@ -286,12 +379,26 @@ fn run(state: &Mutex<RuntimeState>, stop: &AtomicBool) -> Result<(), String> {
     outcome
 }
 
+fn sync_input_tracker<T>(tracker: &mut Option<T>, keyboard_open: bool, create: impl FnOnce() -> T) {
+    if keyboard_open {
+        if tracker.is_none() {
+            *tracker = Some(create());
+        }
+    } else {
+        *tracker = None;
+    }
+}
+
 fn update_gamepad_state(
     state: &mut RuntimeState,
     connected: bool,
     devices: &[GamepadInfo],
     name: impl FnOnce() -> Option<String>,
-) {
+    control_enabled: bool,
+    locale: Locale,
+) -> Vec<Notification> {
+    let was_connected = state.controller.is_some();
+    let had_no_profile = no_usable_profile(&state.devices);
     if connected {
         if state.controller.is_none() {
             state.controller = name();
@@ -304,6 +411,27 @@ fn update_gamepad_state(
         state.devices.extend_from_slice(devices);
     }
     state.ready = true;
+    let is_connected = state.controller.is_some();
+    let has_no_profile = no_usable_profile(&state.devices);
+    let mut notifications = Vec::new();
+    if control_enabled && was_connected != is_connected {
+        if let Some(name) = state.controller.as_ref() {
+            notifications.push(Notification::ControllerConnected {
+                locale,
+                name: name.clone(),
+            });
+        } else {
+            notifications.push(Notification::ControllerDisconnected(locale));
+        }
+    }
+    if has_no_profile && !had_no_profile {
+        notifications.push(Notification::NoUsableProfile(locale));
+    }
+    notifications
+}
+
+fn no_usable_profile(devices: &[GamepadInfo]) -> bool {
+    !devices.is_empty() && devices.iter().all(|device| !device.mapped)
 }
 
 fn same_devices(left: &[GamepadInfo], right: &[GamepadInfo]) -> bool {
@@ -349,6 +477,39 @@ mod tests {
     use crate::control::GamepadFrame;
 
     #[test]
+    fn focused_input_tracker_is_lazy_and_scoped_to_the_open_keyboard() {
+        let mut tracker = None;
+        let mut creations = 0;
+
+        sync_input_tracker(&mut tracker, false, || {
+            creations += 1;
+            creations
+        });
+        assert_eq!(tracker, None);
+        assert_eq!(creations, 0);
+
+        sync_input_tracker(&mut tracker, true, || {
+            creations += 1;
+            creations
+        });
+        assert_eq!(tracker, Some(1));
+
+        sync_input_tracker(&mut tracker, true, || {
+            creations += 1;
+            creations
+        });
+        assert_eq!(tracker, Some(1));
+        assert_eq!(creations, 1);
+
+        sync_input_tracker(&mut tracker, false, || {
+            creations += 1;
+            creations
+        });
+        assert_eq!(tracker, None);
+        assert_eq!(creations, 1);
+    }
+
+    #[test]
     fn r3_requests_the_system_keyboard_without_opening_the_app_panel() {
         let mut state = RuntimeState::default();
         let mut controller = MouseController::default();
@@ -381,19 +542,88 @@ mod tests {
         let mut state = RuntimeState::default();
         let mut name_reads = 0;
 
-        update_gamepad_state(&mut state, true, &devices, || {
-            name_reads += 1;
-            Some("Virtual controller".to_owned())
-        });
-        update_gamepad_state(&mut state, true, &devices, || {
-            name_reads += 1;
-            Some("Virtual controller".to_owned())
-        });
+        update_gamepad_state(
+            &mut state,
+            true,
+            &devices,
+            || {
+                name_reads += 1;
+                Some("Virtual controller".to_owned())
+            },
+            true,
+            Locale::English,
+        );
+        update_gamepad_state(
+            &mut state,
+            true,
+            &devices,
+            || {
+                name_reads += 1;
+                Some("Virtual controller".to_owned())
+            },
+            true,
+            Locale::English,
+        );
 
         assert_eq!(name_reads, 1);
         assert_eq!(state.controller.as_deref(), Some("Virtual controller"));
         assert!(same_devices(&state.devices, &devices));
         assert!(state.ready);
+    }
+
+    #[test]
+    fn gamepad_notifications_follow_connection_and_profile_transitions_once() {
+        use crate::notifications::Notification;
+
+        let mapped = vec![GamepadInfo {
+            id: 7,
+            name: "Mapped controller".to_owned(),
+            guid: "0123456789abcdef0123456789abcdef".to_owned(),
+            mapped: true,
+        }];
+        let unknown = vec![GamepadInfo {
+            mapped: false,
+            ..mapped[0].clone()
+        }];
+        let mut state = RuntimeState::default();
+
+        assert_eq!(
+            update_gamepad_state(
+                &mut state,
+                true,
+                &mapped,
+                || Some("Mapped controller".to_owned()),
+                true,
+                Locale::English,
+            ),
+            vec![Notification::ControllerConnected {
+                locale: Locale::English,
+                name: "Mapped controller".to_owned(),
+            }]
+        );
+        assert!(
+            update_gamepad_state(
+                &mut state,
+                true,
+                &mapped,
+                || Some("ignored repeated read".to_owned()),
+                true,
+                Locale::English,
+            )
+            .is_empty()
+        );
+        assert_eq!(
+            update_gamepad_state(&mut state, false, &[], || None, true, Locale::English,),
+            vec![Notification::ControllerDisconnected(Locale::English)]
+        );
+        assert_eq!(
+            update_gamepad_state(&mut state, false, &unknown, || None, false, Locale::English,),
+            vec![Notification::NoUsableProfile(Locale::English)]
+        );
+        assert!(
+            update_gamepad_state(&mut state, false, &unknown, || None, false, Locale::English,)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -438,7 +668,14 @@ mod tests {
             };
             let optimized_started = Instant::now();
             for _ in 0..ITERATIONS {
-                update_gamepad_state(&mut optimized, true, &devices, || Some(name.to_owned()));
+                update_gamepad_state(
+                    &mut optimized,
+                    true,
+                    &devices,
+                    || Some(name.to_owned()),
+                    true,
+                    Locale::English,
+                );
                 publish_keyboard_state(&mut optimized.keyboard, &keyboard);
                 black_box(&optimized);
             }
