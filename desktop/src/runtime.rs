@@ -278,6 +278,7 @@ fn run(
                 notification_service.send(notification);
             }
             last_tick = now;
+            platform.update_native_dpad_target();
             for action in actions {
                 match action {
                     Action::OnScreenKeyboard(open) => {
@@ -310,7 +311,14 @@ fn run(
                                 .send(Notification::KeyboardUnavailable { locale, detail });
                         }
                     }
-                    action => platform.apply(action)?,
+                    action => {
+                        platform.apply(action)?;
+                        if platform.take_native_dpad_notice() {
+                            let locale = state.lock().expect("runtime state lock").locale;
+                            notification_service
+                                .send(Notification::WindowsNativeNavigation(locale));
+                        }
+                    }
                 }
             }
             let preferences = {

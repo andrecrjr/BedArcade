@@ -36,7 +36,7 @@ help:
 		'Extension: web-install, web-dev, web-build, web-package, web-typecheck, web-lint, web-format, web-format-check, web-test' \
 		'Desktop:   desktop-run, desktop-build, desktop-release, desktop-linux, desktop-linux-package, desktop-windows, desktop-packages, desktop-check, desktop-lint, desktop-format, desktop-format-check, desktop-test, desktop-preview' \
 		'' \
-		'desktop-packages builds Linux and Windows x64 packages into desktop/dist; install the Windows build tools first.' \
+		'desktop-build and desktop-packages build Linux and Windows x64 release packages into desktop/dist; install the Windows build tools first.' \
 		'desktop-windows builds and packages x64 Windows; install the Rust target, MinGW, CMake, and zip first.'
 
 dev: web-dev
@@ -85,8 +85,7 @@ web-test:
 desktop-run:
 	$(CARGO) run --manifest-path $(DESKTOP_MANIFEST)
 
-desktop-build:
-	$(CARGO) build --manifest-path $(DESKTOP_MANIFEST)
+desktop-build: desktop-packages
 
 desktop-release:
 	$(CARGO) build --manifest-path $(DESKTOP_MANIFEST) --release
@@ -102,8 +101,8 @@ desktop-linux-package: desktop-linux
 desktop-windows:
 	PATH="$(if $(MINGW_BIN),$(MINGW_BIN):)$$PATH" $(CARGO) build --manifest-path $(DESKTOP_MANIFEST) --release --target $(WINDOWS_TARGET)
 	mkdir -p $(DESKTOP_DIST_DIR)
-	cp $(WINDOWS_BINARY) $(DESKTOP_DIST_DIR)/gamepad-desktop.exe
-	$(ZIP) -q -j -FS $(WINDOWS_PACKAGE) $(DESKTOP_DIST_DIR)/gamepad-desktop.exe
+	$(ZIP) -q -j -FS $(WINDOWS_PACKAGE) $(WINDOWS_BINARY)
+	rm -f $(DESKTOP_DIST_DIR)/gamepad-desktop.exe
 
 desktop-packages: desktop-linux-package desktop-windows
 

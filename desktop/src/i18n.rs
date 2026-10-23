@@ -203,6 +203,7 @@ catalog! {
     NeedsProfile => (" · profile required", " · necesita un perfil", " · precisa de perfil");
     ControlDesktop => ("Control desktop (Start + Select pauses/resumes)", "Controlar el escritorio (Start + Select pausa/reanuda)", "Controlar desktop (Start + Select pausa/retoma)");
     NotificationTitle => ("Gamepad Desktop", "Gamepad Desktop", "Gamepad Desktop");
+    WindowsNativeNavigationNotice => ("Native Windows navigation enabled.", "Navegación nativa de Windows activada.", "Navegação nativa do Windows ativada.");
     PauseCombo => ("Start + Select / Menu + View", "Start + Select / Menú + Vista", "Start + Select / Menu + View");
     ControlPausedNotice => ("Control paused. Press START + SELECT to resume.", "Control pausado. Pulsa START + SELECT para reanudar.", "Controle pausado. Pressione START + SELECT para retomar.");
     ControlResumedNotice => ("Control resumed. Release all buttons and center both sticks to continue.", "Control reanudado. Suelta los botones y centra ambos sticks para continuar.", "Controle retomado. Solte os botões e centralize os dois analógicos para continuar.");

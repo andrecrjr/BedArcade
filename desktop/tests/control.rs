@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use gamepad_desktop::control::{
-    Action, Button, ControlSettings, GamepadFrame, MouseButton, MouseController, SystemKey,
+    Action, Button, ControlSettings, DpadDirection, GamepadFrame, MouseButton, MouseController,
+    SystemKey,
 };
 
 const TICK: Duration = Duration::from_millis(10);
@@ -27,7 +28,7 @@ fn dpad_sends_arrow_keys_while_mouse_and_drag_work() {
     frame.buttons[Button::South as usize] = true;
     let actions = controller.update(Some(&frame), TICK, &mut settings);
     assert!(actions.contains(&Action::Mouse(MouseButton::Left, true)));
-    assert!(actions.contains(&Action::Key(SystemKey::Down)));
+    assert!(actions.contains(&Action::Dpad(DpadDirection::Down)));
     assert!(
         actions
             .iter()
@@ -256,7 +257,10 @@ fn dpad_arrow_keys_repeat_after_delay_without_repeating_confirm() {
     frame.buttons[Button::West as usize] = true;
     assert_eq!(
         controller.update(Some(&frame), TICK, &mut settings),
-        vec![Action::Key(SystemKey::Enter), Action::Key(SystemKey::Down)]
+        vec![
+            Action::Key(SystemKey::Enter),
+            Action::Dpad(DpadDirection::Down),
+        ]
     );
     for _ in 0..20 {
         assert!(
@@ -272,7 +276,42 @@ fn dpad_arrow_keys_repeat_after_delay_without_repeating_confirm() {
     assert!(
         repeated
             .iter()
-            .all(|action| *action == Action::Key(SystemKey::Down))
+            .all(|action| *action == Action::Dpad(DpadDirection::Down))
+    );
+}
+
+#[test]
+fn dpad_route_ends_only_after_all_directions_are_released() {
+    let (mut controller, mut settings) = ready();
+    let up = pressed(Button::Up);
+    assert!(
+        controller
+            .update(Some(&up), TICK, &mut settings)
+            .contains(&Action::Dpad(DpadDirection::Up))
+    );
+
+    let mut up_and_right = up;
+    up_and_right.buttons[Button::Right as usize] = true;
+    assert!(
+        controller
+            .update(Some(&up_and_right), TICK, &mut settings)
+            .contains(&Action::Dpad(DpadDirection::Right))
+    );
+
+    let right_only = pressed(Button::Right);
+    assert!(
+        !controller
+            .update(Some(&right_only), TICK, &mut settings)
+            .contains(&Action::DpadReleased)
+    );
+    assert_eq!(
+        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings),
+        vec![Action::DpadReleased]
+    );
+    assert!(
+        controller
+            .update(Some(&GamepadFrame::default()), TICK, &mut settings)
+            .is_empty()
     );
 }
 

@@ -22,6 +22,7 @@ pub(crate) enum Notification {
     },
     ControllerDisconnected(Locale),
     NoUsableProfile(Locale),
+    WindowsNativeNavigation(Locale),
     KeyboardUnavailable {
         locale: Locale,
         detail: Option<String>,
@@ -39,7 +40,9 @@ impl Notification {
             | Self::ControllerConnected { locale, .. }
             | Self::KeyboardUnavailable { locale, .. }
             | Self::RuntimeFailure { locale, .. } => *locale,
-            Self::ControllerDisconnected(locale) | Self::NoUsableProfile(locale) => *locale,
+            Self::ControllerDisconnected(locale)
+            | Self::NoUsableProfile(locale)
+            | Self::WindowsNativeNavigation(locale) => *locale,
         };
         let body = match self {
             Self::ControlState { enabled, .. } => locale.text(if *enabled {
@@ -55,6 +58,7 @@ impl Notification {
             }
             Self::ControllerDisconnected(_) => locale.text(Text::ControllerDisconnectedNotice),
             Self::NoUsableProfile(_) => locale.text(Text::NoUsableProfileNotice),
+            Self::WindowsNativeNavigation(_) => locale.text(Text::WindowsNativeNavigationNotice),
             Self::KeyboardUnavailable { detail, .. } => match detail {
                 Some(detail) if !detail.trim().is_empty() => {
                     return (
@@ -269,5 +273,22 @@ mod tests {
         .content();
 
         assert!(body.contains("device unavailable"));
+    }
+
+    #[test]
+    fn native_windows_navigation_notice_is_localized() {
+        let english = Notification::WindowsNativeNavigation(Locale::English)
+            .content()
+            .1;
+        let spanish = Notification::WindowsNativeNavigation(Locale::Spanish)
+            .content()
+            .1;
+        let portuguese = Notification::WindowsNativeNavigation(Locale::PortugueseBrazil)
+            .content()
+            .1;
+
+        assert_eq!(english, "Native Windows navigation enabled.");
+        assert_eq!(spanish, "Navegación nativa de Windows activada.");
+        assert_eq!(portuguese, "Navegação nativa do Windows ativada.");
     }
 }

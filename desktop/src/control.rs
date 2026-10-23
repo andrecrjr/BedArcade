@@ -131,6 +131,14 @@ pub enum SystemKey {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DpadDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardInput {
     Character(char),
     Backspace,
@@ -147,6 +155,8 @@ pub enum Action {
     Scroll(i32),
     Mouse(MouseButton, bool),
     Key(SystemKey),
+    Dpad(DpadDirection),
+    DpadReleased,
     Keyboard(KeyboardInput),
     KeyboardChord(KeyboardInput, KeyboardModifiers),
     NextWindow,
@@ -159,6 +169,7 @@ pub struct MouseController {
     connected: bool,
     armed: bool,
     held: [bool; 2],
+    dpad_routing_held: bool,
     remainder: [f64; 3],
     repeat: [f64; 4],
     system_keyboard_uses_gamepad: bool,
@@ -172,6 +183,7 @@ impl Default for MouseController {
             connected: false,
             armed: false,
             held: [false; 2],
+            dpad_routing_held: false,
             remainder: [0.0; 3],
             repeat: [0.0; 4],
             system_keyboard_uses_gamepad: false,
@@ -267,11 +279,11 @@ impl MouseController {
             }
         }
         let seconds = elapsed.as_secs_f64().min(0.05);
-        for (index, (button, key)) in [
-            (Button::Up, SystemKey::Up),
-            (Button::Down, SystemKey::Down),
-            (Button::Left, SystemKey::Left),
-            (Button::Right, SystemKey::Right),
+        for (index, (button, direction)) in [
+            (Button::Up, DpadDirection::Up),
+            (Button::Down, DpadDirection::Down),
+            (Button::Left, DpadDirection::Left),
+            (Button::Right, DpadDirection::Right),
         ]
         .into_iter()
         .enumerate()
@@ -286,8 +298,17 @@ impl MouseController {
                     DIRECTION_REPEAT_INTERVAL,
                 )
             {
-                actions.push(Action::Key(key));
+                actions.push(Action::Dpad(direction));
+                self.dpad_routing_held = true;
             }
+        }
+        if self.dpad_routing_held
+            && [Button::Up, Button::Down, Button::Left, Button::Right]
+                .into_iter()
+                .all(|button| !frame.pressed(button))
+        {
+            actions.push(Action::DpadReleased);
+            self.dpad_routing_held = false;
         }
         let x = axis_value(frame.x, settings.deadzone);
         let y = axis_value(frame.y, settings.deadzone);
@@ -311,6 +332,10 @@ impl MouseController {
 
     fn release(&mut self, actions: &mut Vec<Action>) {
         self.release_mouse(actions);
+        if self.dpad_routing_held {
+            actions.push(Action::DpadReleased);
+            self.dpad_routing_held = false;
+        }
         self.remainder = [0.0; 3];
         self.repeat = [0.0; 4];
     }

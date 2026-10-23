@@ -10,6 +10,9 @@ pub mod runtime;
 pub(crate) mod startup;
 pub mod tray;
 
+#[cfg(any(target_os = "windows", test))]
+mod windows_navigation;
+
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 pub mod platform;

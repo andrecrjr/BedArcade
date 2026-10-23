@@ -4,7 +4,7 @@ use evdev::{
 };
 use std::env;
 
-use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
+use crate::control::{Action, DpadDirection, KeyboardInput, MouseButton, SystemKey};
 use crate::{
     keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession},
     wayland_keyboard::WaylandKeyboardOverlay,
@@ -78,6 +78,12 @@ impl Platform {
         self.keyboard_overlay_error.as_deref()
     }
 
+    pub(crate) fn update_native_dpad_target(&mut self) {}
+
+    pub(crate) fn take_native_dpad_notice(&mut self) -> bool {
+        false
+    }
+
     pub fn update_keyboard_overlay(&mut self, session: &KeyboardSession) -> Result<(), String> {
         let Some(overlay) = &mut self.keyboard_overlay else {
             return Ok(());
@@ -124,6 +130,16 @@ impl Platform {
                 };
                 self.emit_key(code)
             }
+            Action::Dpad(direction) => {
+                let code = match direction {
+                    DpadDirection::Up => KeyCode::KEY_UP,
+                    DpadDirection::Down => KeyCode::KEY_DOWN,
+                    DpadDirection::Left => KeyCode::KEY_LEFT,
+                    DpadDirection::Right => KeyCode::KEY_RIGHT,
+                };
+                self.emit_key(code)
+            }
+            Action::DpadReleased => return Ok(()),
             Action::Keyboard(input) => {
                 self.emit_keyboard_input(input, KeyboardModifiers::default())
             }
