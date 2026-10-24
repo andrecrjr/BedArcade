@@ -1,3 +1,18 @@
+# [0.4.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.3.2...desktop-v0.4.0) (2026-10-24)
+
+
+### Bug Fixes
+
+* **desktop:** avoid duplicate Playnite fullscreen dpad ([7e7e5a2](https://github.com/andrecrjr/GamepadDesktop/commit/7e7e5a213a8ff929b99269423c8baa451f4202f1))
+* **desktop:** prevent duplicate native dpad input ([77b4e99](https://github.com/andrecrjr/GamepadDesktop/commit/77b4e991be5412a12512de582a29653fb72d9c5d))
+
+
+### Features
+
+* **desktop:** add controller notifications and startup control ([7e3e3cf](https://github.com/andrecrjr/GamepadDesktop/commit/7e3e3cfa880f84cccf721f6f1b909b092790e854))
+* **desktop:** improve controller guide and modes ([b613a5a](https://github.com/andrecrjr/GamepadDesktop/commit/b613a5a914fb840d630a8c035cc4616658819ecf))
+* **desktop:** route native Windows D-pad input and update packaging ([9fecfcc](https://github.com/andrecrjr/GamepadDesktop/commit/9fecfcc38c355ecaee70654f8ea617daa8eb4885))
+
 # [0.3.0](https://github.com/andrecrjr/GamepadDesktop/compare/desktop-v0.2.0...desktop-v0.3.0) (2026-10-22)
 
 
