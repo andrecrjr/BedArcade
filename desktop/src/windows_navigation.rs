@@ -57,24 +57,15 @@ pub(crate) fn resolve_native_windows(
 pub(crate) struct NativeDpadRouting {
     target_active: bool,
     dpad_latched: bool,
-    notice_sent: bool,
-    notice_pending: bool,
 }
 
 impl NativeDpadRouting {
     pub(crate) fn set_target_active(&mut self, active: bool) {
         self.target_active = active;
-        if !active {
-            self.notice_sent = false;
-        }
     }
 
     pub(crate) fn should_synthesize(&mut self) -> bool {
         if self.target_active {
-            if !self.notice_sent {
-                self.notice_pending = true;
-                self.notice_sent = true;
-            }
             self.dpad_latched = true;
             false
         } else {
@@ -84,10 +75,6 @@ impl NativeDpadRouting {
 
     pub(crate) fn release_dpad(&mut self) {
         self.dpad_latched = false;
-    }
-
-    pub(crate) fn take_notice(&mut self) -> bool {
-        std::mem::take(&mut self.notice_pending)
     }
 }
 
@@ -267,7 +254,6 @@ mod tests {
 
         routing.set_target_active(cache.resolve(identity, || Some(true)));
         assert!(!routing.should_synthesize());
-        assert!(routing.take_notice());
     }
 
     #[test]
@@ -318,9 +304,7 @@ mod tests {
         routing.set_target_active(true);
 
         assert!(!routing.should_synthesize());
-        assert!(routing.take_notice());
         assert!(!routing.should_synthesize());
-        assert!(!routing.take_notice());
 
         routing.set_target_active(false);
         assert!(!routing.should_synthesize());
@@ -329,16 +313,14 @@ mod tests {
     }
 
     #[test]
-    fn native_navigation_notice_can_be_sent_again_after_leaving_the_system_ui() {
+    fn native_navigation_suppression_recovers_after_reentering_the_system_ui() {
         let mut routing = NativeDpadRouting::default();
         routing.set_target_active(true);
         assert!(!routing.should_synthesize());
-        assert!(routing.take_notice());
         routing.release_dpad();
 
         routing.set_target_active(false);
         routing.set_target_active(true);
         assert!(!routing.should_synthesize());
-        assert!(routing.take_notice());
     }
 }

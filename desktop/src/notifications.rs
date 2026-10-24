@@ -3,7 +3,10 @@ use std::{
     thread,
 };
 
-use crate::i18n::{Locale, Text};
+use crate::{
+    control::ControlMode,
+    i18n::{Locale, Text},
+};
 
 const APP_NAME: &str = "Gamepad Desktop";
 
@@ -16,13 +19,16 @@ pub(crate) enum Notification {
         enabled: bool,
         locale: Locale,
     },
+    InputModeChanged {
+        mode: ControlMode,
+        locale: Locale,
+    },
     ControllerConnected {
         locale: Locale,
         name: String,
     },
     ControllerDisconnected(Locale),
     NoUsableProfile(Locale),
-    WindowsNativeNavigation(Locale),
     KeyboardUnavailable {
         locale: Locale,
         detail: Option<String>,
@@ -37,18 +43,21 @@ impl Notification {
     fn content(&self) -> (String, String) {
         let locale = match self {
             Self::ControlState { locale, .. }
+            | Self::InputModeChanged { locale, .. }
             | Self::ControllerConnected { locale, .. }
             | Self::KeyboardUnavailable { locale, .. }
             | Self::RuntimeFailure { locale, .. } => *locale,
-            Self::ControllerDisconnected(locale)
-            | Self::NoUsableProfile(locale)
-            | Self::WindowsNativeNavigation(locale) => *locale,
+            Self::ControllerDisconnected(locale) | Self::NoUsableProfile(locale) => *locale,
         };
         let body = match self {
             Self::ControlState { enabled, .. } => locale.text(if *enabled {
                 Text::ControlResumedNotice
             } else {
                 Text::ControlPausedNotice
+            }),
+            Self::InputModeChanged { mode, .. } => locale.text(match mode {
+                ControlMode::Desktop => Text::DesktopModeNotice,
+                ControlMode::Game => Text::GameModeNotice,
             }),
             Self::ControllerConnected { name, .. } => {
                 return (
@@ -58,7 +67,6 @@ impl Notification {
             }
             Self::ControllerDisconnected(_) => locale.text(Text::ControllerDisconnectedNotice),
             Self::NoUsableProfile(_) => locale.text(Text::NoUsableProfileNotice),
-            Self::WindowsNativeNavigation(_) => locale.text(Text::WindowsNativeNavigationNotice),
             Self::KeyboardUnavailable { detail, .. } => match detail {
                 Some(detail) if !detail.trim().is_empty() => {
                     return (
@@ -273,22 +281,5 @@ mod tests {
         .content();
 
         assert!(body.contains("device unavailable"));
-    }
-
-    #[test]
-    fn native_windows_navigation_notice_is_localized() {
-        let english = Notification::WindowsNativeNavigation(Locale::English)
-            .content()
-            .1;
-        let spanish = Notification::WindowsNativeNavigation(Locale::Spanish)
-            .content()
-            .1;
-        let portuguese = Notification::WindowsNativeNavigation(Locale::PortugueseBrazil)
-            .content()
-            .1;
-
-        assert_eq!(english, "Native Windows navigation enabled.");
-        assert_eq!(spanish, "Navegación nativa de Windows activada.");
-        assert_eq!(portuguese, "Navegação nativa do Windows ativada.");
     }
 }

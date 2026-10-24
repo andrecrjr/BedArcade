@@ -463,7 +463,7 @@ fn ctrl_enter_uses_a_single_chord_and_releases_the_virtual_modifier() {
     controller.update(Some(&pressed(Button::RightStick)), TICK, &mut settings);
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     controller.keyboard.modifiers.control = true;
-    controller.keyboard.selected_row = 2;
+    controller.keyboard.selected_row = 3;
     controller.keyboard.selected_column = 12; // Enter
     let actions = controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
     assert_eq!(
@@ -566,7 +566,7 @@ fn caps_and_shift_affect_letters_without_changing_number_keys() {
         controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
         vec![Action::Keyboard(KeyboardInput::Character('a'))]
     );
-    controller.keyboard.selected_row = 0;
+    controller.keyboard.selected_row = 1;
     controller.keyboard.selected_column = 1;
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     assert_eq!(

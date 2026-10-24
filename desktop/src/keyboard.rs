@@ -9,6 +9,7 @@ pub enum KeyboardPresentation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardKey {
     Character(char),
+    Function(u8),
     Backspace,
     Enter,
     Escape,
@@ -24,11 +25,28 @@ pub enum KeyboardKey {
 
 pub use crate::i18n::{Locale, Text};
 use KeyboardKey::{
-    Alt, Backspace, CapsLock, Character as C, Control, Enter, Menu, Meta, Shift, Space, Tab,
+    Alt, Backspace, CapsLock, Character as C, Control, Enter, Function as F, Menu, Meta, Shift,
+    Space, Tab,
 };
 
-/// ANSI QWERTY typing block. Every row spans exactly 15 key units.
+const FUNCTION_ROW: [KeyboardKey; 12] = [
+    F(1),
+    F(2),
+    F(3),
+    F(4),
+    F(5),
+    F(6),
+    F(7),
+    F(8),
+    F(9),
+    F(10),
+    F(11),
+    F(12),
+];
+
+/// ANSI QWERTY typing block with a function-key row. Every row spans 15 key units.
 pub const KEY_ROWS: &[&[KeyboardKey]] = &[
+    &FUNCTION_ROW,
     &[
         C('`'),
         C('1'),
@@ -96,13 +114,14 @@ pub const KEY_ROWS: &[&[KeyboardKey]] = &[
 /// Width in quarter-key units; used by rendering and spatial navigation.
 pub fn key_width_quarters(row: usize, column: usize) -> u16 {
     match (row, column) {
-        (0, 13) => 8,
-        (1, 0 | 13) => 6,
-        (2, 0) => 7,
-        (2, 12) | (3, 0) => 9,
-        (3, 11) => 11,
-        (4, 3) => 25,
-        (4, _) => 5,
+        (0, _) => 5,
+        (1, 13) => 8,
+        (2, 0 | 13) => 6,
+        (3, 0) => 7,
+        (3, 12) | (4, 0) => 9,
+        (4, 11) => 11,
+        (5, 3) => 25,
+        (5, _) => 5,
         _ => 4,
     }
 }
@@ -286,7 +305,7 @@ impl Default for KeyboardSession {
             open: false,
             status: None,
             presentation: KeyboardPresentation::default(),
-            selected_row: 2,
+            selected_row: 3,
             selected_column: 1,
             shift: false,
             caps_lock: false,
@@ -355,6 +374,7 @@ impl KeyboardKey {
         match self.character(shift) {
             Some(character) => character.to_string(),
             None => match self {
+                Self::Function(number) => format!("F{number}"),
                 Self::Backspace => "Backspace".to_owned(),
                 Self::Enter => "Enter".to_owned(),
                 Self::Escape => "Esc".to_owned(),

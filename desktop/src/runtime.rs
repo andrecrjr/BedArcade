@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    control::{Action, ControlSettings, GamepadFrame, MouseController},
+    control::{Action, ControlMode, ControlSettings, GamepadFrame, MouseController},
     gamepads::{GamepadInfo, Gamepads},
     i18n::Locale,
     keyboard::{KeyboardSession, KeyboardSettings},
@@ -93,12 +93,19 @@ impl DesktopRuntime {
     pub fn configure(&self, settings: ControlSettings) {
         let mut state = self.state.lock().expect("runtime state lock");
         let enabled_changed = state.settings.enabled != settings.enabled;
+        let mode_changed = state.settings.mode != settings.mode;
         let locale = state.locale;
         state.settings = settings;
         drop(state);
         if enabled_changed {
             self.notifications.send(Notification::ControlState {
                 enabled: settings.enabled,
+                locale,
+            });
+        }
+        if mode_changed && settings.mode == ControlMode::Desktop {
+            self.notifications.send(Notification::InputModeChanged {
+                mode: settings.mode,
                 locale,
             });
         }
@@ -252,6 +259,7 @@ fn run(
                 let mut state = state.lock().expect("runtime state lock");
                 let locale = state.locale;
                 let enabled_before = state.settings.enabled;
+                let mode_before = state.settings.mode;
                 let mut notifications = update_gamepad_state(
                     &mut state,
                     frame.is_some(),
@@ -272,14 +280,22 @@ fn run(
                         locale,
                     });
                 }
+                if state.settings.mode != mode_before && state.settings.mode == ControlMode::Desktop
+                {
+                    notifications.push(Notification::InputModeChanged {
+                        mode: state.settings.mode,
+                        locale,
+                    });
+                }
                 (actions, notifications)
             };
             for notification in notifications {
                 notification_service.send(notification);
             }
             last_tick = now;
+            let settings = state.lock().expect("runtime state lock").settings;
             platform.update_mouse_mode(
-                state.lock().expect("runtime state lock").settings.enabled,
+                settings.enabled && settings.mode == ControlMode::Desktop,
                 frame.is_some(),
             )?;
             platform.update_native_dpad_target();
@@ -317,11 +333,6 @@ fn run(
                     }
                     action => {
                         platform.apply(action)?;
-                        if platform.take_native_dpad_notice() {
-                            let locale = state.lock().expect("runtime state lock").locale;
-                            notification_service
-                                .send(Notification::WindowsNativeNavigation(locale));
-                        }
                     }
                 }
             }

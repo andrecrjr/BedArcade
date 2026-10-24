@@ -84,10 +84,6 @@ impl Platform {
         Ok(())
     }
 
-    pub(crate) fn take_native_dpad_notice(&mut self) -> bool {
-        false
-    }
-
     pub fn update_keyboard_overlay(&mut self, session: &KeyboardSession) -> Result<(), String> {
         let Some(overlay) = &mut self.keyboard_overlay else {
             return Ok(());
@@ -178,6 +174,24 @@ impl Platform {
         let (key, shifted) = match input {
             KeyboardInput::Character(character) => ascii_key(character)
                 .ok_or_else(|| std::io::Error::other("caractere não suportado"))?,
+            KeyboardInput::Function(number) => (
+                match number {
+                    1 => KeyCode::KEY_F1,
+                    2 => KeyCode::KEY_F2,
+                    3 => KeyCode::KEY_F3,
+                    4 => KeyCode::KEY_F4,
+                    5 => KeyCode::KEY_F5,
+                    6 => KeyCode::KEY_F6,
+                    7 => KeyCode::KEY_F7,
+                    8 => KeyCode::KEY_F8,
+                    9 => KeyCode::KEY_F9,
+                    10 => KeyCode::KEY_F10,
+                    11 => KeyCode::KEY_F11,
+                    12 => KeyCode::KEY_F12,
+                    _ => return Err(std::io::Error::other("tecla de função inválida")),
+                },
+                false,
+            ),
             KeyboardInput::Backspace => (KeyCode::KEY_BACKSPACE, false),
             KeyboardInput::Enter => (KeyCode::KEY_ENTER, false),
             KeyboardInput::Escape => (KeyCode::KEY_ESC, false),

@@ -4,6 +4,7 @@ use crate::keyboard::{KeyboardKey, KeyboardModifiers, KeyboardSession};
 
 const REPEAT_INITIAL_DELAY: f64 = 0.4;
 const DIRECTION_REPEAT_INTERVAL: f64 = 0.08;
+const SELECT_DOUBLE_TAP_WINDOW: Duration = Duration::from_millis(400);
 
 pub const MOUSE_SHORTCUTS: &[(&str, &str)] = &[
     (
@@ -36,11 +37,15 @@ pub const MOUSE_SHORTCUTS: &[(&str, &str)] = &[
         "Start + Select / Menu + View",
         "Pausar / retomar · solte e centralize para retomar",
     ),
+    (
+        "Select · dois toques rápidos",
+        "Alternar entre Desktop e Jogo",
+    ),
 ];
 
 pub const KEYBOARD_SHORTCUTS: &[(&str, &str)] = &[
     ("Direcional", "Mover a seleção pelo teclado"),
-    ("A / botão inferior", "Digitar a tecla selecionada"),
+    ("A / botão inferior", "Ativar a tecla selecionada"),
     ("B / botão direito", "Apagar um caractere"),
     ("X / botão esquerdo", "Inserir Enter"),
     ("Y / botão superior", "Inserir Esc"),
@@ -86,10 +91,28 @@ impl GamepadFrame {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ControlMode {
+    #[default]
+    Desktop,
+    Game,
+}
+
+impl ControlMode {
+    fn toggled(self) -> Self {
+        match self {
+            Self::Desktop => Self::Game,
+            Self::Game => Self::Desktop,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct ControlSettings {
     pub enabled: bool,
+    pub mode: ControlMode,
     pub speed: f64,
     pub deadzone: f64,
 }
@@ -98,6 +121,7 @@ impl Default for ControlSettings {
     fn default() -> Self {
         Self {
             enabled: true,
+            mode: ControlMode::Desktop,
             speed: 1800.0,
             deadzone: 0.2,
         }
@@ -141,6 +165,7 @@ pub enum DpadDirection {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardInput {
     Character(char),
+    Function(u8),
     Backspace,
     Enter,
     Escape,
@@ -173,6 +198,8 @@ pub struct MouseController {
     remainder: [f64; 3],
     repeat: [f64; 4],
     system_keyboard_uses_gamepad: bool,
+    select_tap_remaining: Option<Duration>,
+    mode: ControlMode,
 }
 
 impl Default for MouseController {
@@ -187,6 +214,8 @@ impl Default for MouseController {
             remainder: [0.0; 3],
             repeat: [0.0; 4],
             system_keyboard_uses_gamepad: false,
+            select_tap_remaining: None,
+            mode: ControlMode::Desktop,
         }
     }
 }
@@ -208,6 +237,7 @@ impl MouseController {
             self.release(&mut actions);
             self.connected = false;
             self.armed = false;
+            self.select_tap_remaining = None;
             self.previous = GamepadFrame::default();
             return actions;
         };
@@ -215,15 +245,56 @@ impl MouseController {
             self.previous = *frame;
             self.connected = true;
         }
+        if self.mode != settings.mode {
+            self.mode = settings.mode;
+            self.select_tap_remaining = None;
+            self.close_keyboard(&mut actions);
+            self.release(&mut actions);
+            self.armed = false;
+            self.previous = *frame;
+            return actions;
+        }
+        if let Some(remaining) = self.select_tap_remaining {
+            self.select_tap_remaining = remaining
+                .checked_sub(elapsed)
+                .filter(|remaining| !remaining.is_zero());
+        }
         let pause_chord = frame.pressed(Button::Start) && frame.pressed(Button::Select);
         let previous_pause_chord =
             self.previous.pressed(Button::Start) && self.previous.pressed(Button::Select);
-        if !(self.keyboard.open && self.system_keyboard_uses_gamepad)
+        let keyboard_uses_gamepad = self.keyboard.open && self.system_keyboard_uses_gamepad;
+        if pause_chord {
+            self.select_tap_remaining = None;
+        }
+        if settings.mode == ControlMode::Desktop
+            && !keyboard_uses_gamepad
             && pause_chord
             && !previous_pause_chord
         {
             settings.enabled = !settings.enabled;
             self.armed = false;
+        }
+        let select_pressed =
+            frame.pressed(Button::Select) && !self.previous.pressed(Button::Select);
+        if !keyboard_uses_gamepad && !pause_chord && select_pressed {
+            if self.select_tap_remaining.is_some() {
+                settings.mode = settings.mode.toggled();
+                self.mode = settings.mode;
+                self.select_tap_remaining = None;
+                self.close_keyboard(&mut actions);
+                self.release(&mut actions);
+                self.armed = false;
+                self.previous = *frame;
+                return actions;
+            }
+            self.select_tap_remaining = Some(SELECT_DOUBLE_TAP_WINDOW);
+        }
+        if settings.mode == ControlMode::Game {
+            self.close_keyboard(&mut actions);
+            self.release(&mut actions);
+            self.armed = false;
+            self.previous = *frame;
+            return actions;
         }
         if !settings.enabled || !self.armed {
             if !settings.enabled {
@@ -239,7 +310,6 @@ impl MouseController {
             return actions;
         }
 
-        let keyboard_uses_gamepad = self.keyboard.open && self.system_keyboard_uses_gamepad;
         let keyboard_toggled =
             frame.pressed(Button::RightStick) && !self.previous.pressed(Button::RightStick);
         if keyboard_toggled {
@@ -466,6 +536,9 @@ impl MouseController {
                     let character = key.character(self.keyboard.shifted(key)).unwrap();
                     actions.push(self.keyboard_action(KeyboardInput::Character(character)));
                     self.keyboard.shift = false;
+                }
+                KeyboardKey::Function(number) => {
+                    actions.push(self.keyboard_action(KeyboardInput::Function(number)))
                 }
                 KeyboardKey::Backspace => {
                     actions.push(self.keyboard_action(KeyboardInput::Backspace))

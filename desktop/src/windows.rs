@@ -52,10 +52,6 @@ impl Platform {
         self.refresh_native_dpad_target(false);
     }
 
-    pub(crate) fn take_native_dpad_notice(&mut self) -> bool {
-        self.native_dpad.take_notice()
-    }
-
     pub(crate) fn update_mouse_mode(
         &mut self,
         enabled: bool,
@@ -183,6 +179,21 @@ impl Platform {
     ) -> Result<(), enigo::InputError> {
         let key = match input {
             KeyboardInput::Character(character) => Key::Unicode(character),
+            KeyboardInput::Function(number) => match number {
+                1 => Key::F1,
+                2 => Key::F2,
+                3 => Key::F3,
+                4 => Key::F4,
+                5 => Key::F5,
+                6 => Key::F6,
+                7 => Key::F7,
+                8 => Key::F8,
+                9 => Key::F9,
+                10 => Key::F10,
+                11 => Key::F11,
+                12 => Key::F12,
+                _ => return Ok(()),
+            },
             KeyboardInput::Backspace => Key::Backspace,
             KeyboardInput::Enter => Key::Return,
             KeyboardInput::Escape => Key::Escape,
