@@ -2,7 +2,7 @@ use gamepad_desktop::keyboard::{KEY_ROWS, KeyboardKey, KeyboardSession, key_widt
 
 #[test]
 fn typing_rows_follow_the_standard_qwerty_keyboard() {
-    let characters: Vec<String> = KEY_ROWS[..4]
+    let characters: Vec<String> = KEY_ROWS[1..5]
         .iter()
         .map(|row| row.iter().filter_map(|key| key.character(false)).collect())
         .collect();
@@ -15,10 +15,12 @@ fn typing_rows_follow_the_standard_qwerty_keyboard() {
             "zxcvbnm,./"
         ]
     );
-    assert_eq!(KEY_ROWS[1][0], KeyboardKey::Tab);
-    assert_eq!(KEY_ROWS[2][0].label(false), "Caps");
-    assert_eq!(KEY_ROWS[3][0], KeyboardKey::Shift);
-    assert_eq!(KEY_ROWS[3].last(), Some(&KeyboardKey::Shift));
+    assert_eq!(KEY_ROWS[0].first(), Some(&KeyboardKey::Function(1)));
+    assert_eq!(KEY_ROWS[0].last(), Some(&KeyboardKey::Function(12)));
+    assert_eq!(KEY_ROWS[2][0], KeyboardKey::Tab);
+    assert_eq!(KEY_ROWS[3][0].label(false), "Caps");
+    assert_eq!(KEY_ROWS[4][0], KeyboardKey::Shift);
+    assert_eq!(KEY_ROWS[4].last(), Some(&KeyboardKey::Shift));
 }
 
 #[test]
@@ -31,15 +33,15 @@ fn qwerty_rows_use_physical_key_proportions() {
             60
         );
     }
-    assert_eq!(key_width_quarters(1, 0), 6); // Tab: 1.5 keys
-    assert_eq!(key_width_quarters(3, 0), 9); // Left Shift: 2.25 keys
-    assert_eq!(key_width_quarters(4, 3), 25); // Space: 6.25 keys
+    assert_eq!(key_width_quarters(2, 0), 6); // Tab: 1.5 keys
+    assert_eq!(key_width_quarters(4, 0), 9); // Left Shift: 2.25 keys
+    assert_eq!(key_width_quarters(5, 3), 25); // Space: 6.25 keys
 }
 
 #[test]
 fn vertical_navigation_enters_space_and_returns_to_the_original_key() {
     let mut keyboard = KeyboardSession::default();
-    keyboard.selected_row = 1;
+    keyboard.selected_row = 2;
     keyboard.selected_column = 4;
     assert_eq!(keyboard.selected_key(), KeyboardKey::Character('r'));
     for _ in 0..3 {

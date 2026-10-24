@@ -34,7 +34,7 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
             let title = if session.customizing {
                 session.locale.text(Text::KeyboardSettingsTitle)
             } else {
-                "QWERTY"
+                "QWERTY · F1–F12"
             };
             painter.text(
                 point(12.0, 17.0),
@@ -104,8 +104,8 @@ pub fn show(ui: &mut egui::Ui, session: &KeyboardSession) {
                     for (column, key) in row.iter().copied().enumerate() {
                         let units = f32::from(key_width_quarters(row_index, column)) / 4.0;
                         let rect = Rect::from_min_size(
-                            point(x, 36.0 + row_index as f32 * 37.0),
-                            Vec2::new(units * unit - 4.0, 33.0) * scale,
+                            point(x, 36.0 + row_index as f32 * 32.0),
+                            Vec2::new(units * unit - 4.0, 28.0) * scale,
                         );
                         let selected =
                             session.selected_row == row_index && session.selected_column == column;

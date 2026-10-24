@@ -1,10 +1,39 @@
+use std::time::{Duration, Instant};
+
 use enigo::{Axis as ScrollAxis, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 
-use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
+use crate::control::{Action, DpadDirection, KeyboardInput, MouseButton, SystemKey};
 use crate::keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession};
+use crate::windows_navigation::{
+    NativeDpadRouting, NativeDpadTargetCache, PausedCursor, is_native_windows_target,
+    resolve_native_windows,
+};
+use windows::{
+    Win32::{
+        Foundation::{CloseHandle, HWND},
+        System::Threading::{
+            OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+            QueryFullProcessImageNameW,
+        },
+        UI::WindowsAndMessaging::{
+            CreateCursor, GA_ROOT, GUITHREADINFO, GetAncestor, GetClassNameW, GetForegroundWindow,
+            GetGUIThreadInfo, GetWindowThreadProcessId, OCR_APPSTARTING, OCR_CROSS, OCR_HAND,
+            OCR_HELP, OCR_IBEAM, OCR_NO, OCR_NORMAL, OCR_SIZEALL, OCR_SIZENESW, OCR_SIZENS,
+            OCR_SIZENWSE, OCR_SIZEWE, OCR_UP, OCR_WAIT, SPI_SETCURSORS,
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SetSystemCursor, SystemParametersInfoW,
+        },
+    },
+    core::PWSTR,
+};
+
+const NAVIGATION_TARGET_CHECK_INTERVAL: Duration = Duration::from_millis(50);
 
 pub struct Platform {
     input: Enigo,
+    native_dpad: NativeDpadRouting,
+    target_cache: [NativeDpadTargetCache; 3],
+    paused_cursor: PausedCursor,
+    last_target_check: Option<Instant>,
 }
 
 impl Platform {
@@ -12,7 +41,25 @@ impl Platform {
         Ok(Self {
             input: Enigo::new(&Settings::default())
                 .map_err(|error| format!("Falha ao conectar entrada do Windows: {error}"))?,
+            native_dpad: NativeDpadRouting::default(),
+            target_cache: Default::default(),
+            paused_cursor: PausedCursor::default(),
+            last_target_check: None,
         })
+    }
+
+    pub(crate) fn update_native_dpad_target(&mut self) {
+        self.refresh_native_dpad_target(false);
+    }
+
+    pub(crate) fn update_mouse_mode(
+        &mut self,
+        enabled: bool,
+        connected: bool,
+    ) -> Result<(), String> {
+        self.paused_cursor
+            .sync(enabled, connected, set_cursor_hidden)
+            .map_err(|error| format!("Falha atualizando cursor do Windows: {error}"))
     }
 
     pub fn system_keyboard_uses_gamepad(&self) -> bool {
@@ -31,9 +78,56 @@ impl Platform {
         Ok(())
     }
 
+    fn refresh_native_dpad_target(&mut self, force: bool) {
+        if !force
+            && self
+                .last_target_check
+                .is_some_and(|last| last.elapsed() < NAVIGATION_TARGET_CHECK_INTERVAL)
+        {
+            return;
+        }
+        self.last_target_check = Some(Instant::now());
+
+        let Some(windows) = Self::navigation_windows() else {
+            self.target_cache = Default::default();
+            self.native_dpad.set_target_active(false);
+            return;
+        };
+        let identities = windows.map(|window| {
+            let mut process_id = 0;
+            unsafe {
+                GetWindowThreadProcessId(window, Some(&mut process_id));
+            }
+            (window.0 as isize, process_id)
+        });
+        let active = resolve_native_windows(&mut self.target_cache, identities, |handle| {
+            Self::is_native_system_window(HWND(handle as *mut _))
+        });
+        self.native_dpad.set_target_active(active);
+    }
+
     pub fn apply(&mut self, action: Action) -> Result<(), String> {
         let result = match action {
             Action::OnScreenKeyboard(_) => return Ok(()),
+            Action::Dpad(direction) => {
+                self.refresh_native_dpad_target(true);
+                if !self.native_dpad.should_synthesize() {
+                    return Ok(());
+                }
+                self.input.key(
+                    match direction {
+                        DpadDirection::Up => Key::UpArrow,
+                        DpadDirection::Down => Key::DownArrow,
+                        DpadDirection::Left => Key::LeftArrow,
+                        DpadDirection::Right => Key::RightArrow,
+                    },
+                    Direction::Click,
+                )
+            }
+            Action::DpadReleased => {
+                self.native_dpad.release_dpad();
+                return Ok(());
+            }
             Action::Move(x, y) => self.input.move_mouse(x, y, Coordinate::Rel),
             Action::Scroll(amount) => self.input.scroll(amount, ScrollAxis::Vertical),
             Action::Mouse(button, pressed) => self.input.button(
@@ -85,6 +179,21 @@ impl Platform {
     ) -> Result<(), enigo::InputError> {
         let key = match input {
             KeyboardInput::Character(character) => Key::Unicode(character),
+            KeyboardInput::Function(number) => match number {
+                1 => Key::F1,
+                2 => Key::F2,
+                3 => Key::F3,
+                4 => Key::F4,
+                5 => Key::F5,
+                6 => Key::F6,
+                7 => Key::F7,
+                8 => Key::F8,
+                9 => Key::F9,
+                10 => Key::F10,
+                11 => Key::F11,
+                12 => Key::F12,
+                _ => return Ok(()),
+            },
             KeyboardInput::Backspace => Key::Backspace,
             KeyboardInput::Enter => Key::Return,
             KeyboardInput::Escape => Key::Escape,
@@ -111,11 +220,132 @@ impl Platform {
         }
         result
     }
+
+    fn is_native_system_window(window: HWND) -> Option<bool> {
+        let mut process_id = 0;
+        unsafe {
+            GetWindowThreadProcessId(window, Some(&mut process_id));
+        }
+        if process_id == 0 {
+            return None;
+        }
+
+        let process =
+            unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id).ok()? };
+        let mut path = [0_u16; 32_768];
+        let mut length = path.len() as u32;
+        let result = unsafe {
+            QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(path.as_mut_ptr()),
+                &mut length,
+            )
+        };
+        let _ = unsafe { CloseHandle(process) };
+        result.ok()?;
+
+        let windows_directory = std::env::var("WINDIR").ok()?;
+        let class = Self::window_class(window);
+        if class.is_empty() {
+            return None;
+        }
+        let image_path = String::from_utf16_lossy(&path[..length as usize]);
+        Some(is_native_windows_target(
+            &image_path,
+            &windows_directory,
+            &class,
+        ))
+    }
+
+    fn window_class(window: HWND) -> String {
+        let mut name = [0_u16; 128];
+        let length = unsafe { GetClassNameW(window, &mut name) };
+        if length <= 0 {
+            return String::new();
+        }
+        String::from_utf16_lossy(&name[..length as usize])
+    }
+
+    fn navigation_windows() -> Option<[HWND; 3]> {
+        unsafe {
+            let foreground = GetForegroundWindow();
+            if foreground.is_invalid() {
+                return None;
+            }
+
+            let mut thread = GUITHREADINFO {
+                cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+                ..Default::default()
+            };
+            let focus = GetGUIThreadInfo(0, &mut thread)
+                .ok()
+                .map(|()| thread.hwndFocus)
+                .filter(|window| !window.is_invalid())
+                .unwrap_or(foreground);
+            let root = GetAncestor(focus, GA_ROOT);
+            Some([
+                foreground,
+                focus,
+                if root.is_invalid() { foreground } else { root },
+            ])
+        }
+    }
 }
 
 impl Drop for Platform {
     fn drop(&mut self) {
+        let _ = self.update_mouse_mode(true, false);
         let _ = self.input.button(enigo::Button::Left, Direction::Release);
         let _ = self.input.button(enigo::Button::Right, Direction::Release);
     }
+}
+
+// ShowCursor only affects the calling thread's windows. Replace the standard
+// shapes temporarily so the cursor is hidden over other applications as well.
+// No registry changes: restoring reloads the user's configured cursor scheme.
+fn set_cursor_hidden(hidden: bool) -> windows::core::Result<()> {
+    if !hidden {
+        return unsafe {
+            SystemParametersInfoW(
+                SPI_SETCURSORS,
+                0,
+                None,
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            )
+        };
+    }
+    for id in [
+        OCR_NORMAL,
+        OCR_IBEAM,
+        OCR_WAIT,
+        OCR_CROSS,
+        OCR_UP,
+        OCR_SIZENWSE,
+        OCR_SIZENESW,
+        OCR_SIZEWE,
+        OCR_SIZENS,
+        OCR_SIZEALL,
+        OCR_NO,
+        OCR_HAND,
+        OCR_APPSTARTING,
+        OCR_HELP,
+    ] {
+        // Monochrome AND=1, XOR=0 preserves the screen underneath each pixel.
+        let and_mask = [0xff_u8; 128];
+        let xor_mask = [0_u8; 128];
+        unsafe {
+            let cursor = CreateCursor(
+                None,
+                0,
+                0,
+                32,
+                32,
+                and_mask.as_ptr().cast(),
+                xor_mask.as_ptr().cast(),
+            )?;
+            SetSystemCursor(cursor, id)?;
+        }
+    }
+    Ok(())
 }

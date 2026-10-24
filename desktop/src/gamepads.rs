@@ -202,6 +202,7 @@ impl Gamepads {
             (Button::RightStick, PadButton::RightStick),
             (Button::LeftStick, PadButton::LeftStick),
             (Button::Start, PadButton::Start),
+            (Button::Select, PadButton::Back),
         ] {
             frame.buttons[button as usize] = gamepad.button(native);
         }

@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use gamepad_desktop::control::{
-    Action, Button, ControlSettings, GamepadFrame, MouseButton, MouseController, SystemKey,
+    Action, Button, ControlSettings, DpadDirection, GamepadFrame, MouseButton, MouseController,
+    SystemKey,
 };
 
 const TICK: Duration = Duration::from_millis(10);
@@ -27,7 +28,7 @@ fn dpad_sends_arrow_keys_while_mouse_and_drag_work() {
     frame.buttons[Button::South as usize] = true;
     let actions = controller.update(Some(&frame), TICK, &mut settings);
     assert!(actions.contains(&Action::Mouse(MouseButton::Left, true)));
-    assert!(actions.contains(&Action::Key(SystemKey::Down)));
+    assert!(actions.contains(&Action::Dpad(DpadDirection::Down)));
     assert!(
         actions
             .iter()
@@ -171,10 +172,18 @@ fn disconnect_releases_buttons_and_reconnect_requires_neutral() {
 }
 
 #[test]
-fn start_pauses_releases_drag_and_does_not_repeat_while_held() {
+fn start_alone_does_not_pause_mouse_controls() {
+    let (mut controller, mut settings) = ready();
+    controller.update(Some(&pressed(Button::Start)), TICK, &mut settings);
+    assert!(settings.enabled);
+}
+
+#[test]
+fn start_and_select_pause_resume_once_and_release_drag() {
     let (mut controller, mut settings) = ready();
     controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
     let mut frame = pressed(Button::Start);
+    frame.buttons[Button::Select as usize] = true;
     frame.buttons[Button::South as usize] = true;
     assert_eq!(
         controller.update(Some(&frame), TICK, &mut settings),
@@ -194,6 +203,11 @@ fn start_pauses_releases_drag_and_does_not_repeat_while_held() {
         controller
             .update(Some(&frame), TICK, &mut settings)
             .is_empty()
+    );
+    controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
+    assert_eq!(
+        controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
+        vec![Action::Mouse(MouseButton::Left, true)]
     );
 }
 
@@ -243,7 +257,10 @@ fn dpad_arrow_keys_repeat_after_delay_without_repeating_confirm() {
     frame.buttons[Button::West as usize] = true;
     assert_eq!(
         controller.update(Some(&frame), TICK, &mut settings),
-        vec![Action::Key(SystemKey::Enter), Action::Key(SystemKey::Down)]
+        vec![
+            Action::Key(SystemKey::Enter),
+            Action::Dpad(DpadDirection::Down),
+        ]
     );
     for _ in 0..20 {
         assert!(
@@ -259,7 +276,42 @@ fn dpad_arrow_keys_repeat_after_delay_without_repeating_confirm() {
     assert!(
         repeated
             .iter()
-            .all(|action| *action == Action::Key(SystemKey::Down))
+            .all(|action| *action == Action::Dpad(DpadDirection::Down))
+    );
+}
+
+#[test]
+fn dpad_route_ends_only_after_all_directions_are_released() {
+    let (mut controller, mut settings) = ready();
+    let up = pressed(Button::Up);
+    assert!(
+        controller
+            .update(Some(&up), TICK, &mut settings)
+            .contains(&Action::Dpad(DpadDirection::Up))
+    );
+
+    let mut up_and_right = up;
+    up_and_right.buttons[Button::Right as usize] = true;
+    assert!(
+        controller
+            .update(Some(&up_and_right), TICK, &mut settings)
+            .contains(&Action::Dpad(DpadDirection::Right))
+    );
+
+    let right_only = pressed(Button::Right);
+    assert!(
+        !controller
+            .update(Some(&right_only), TICK, &mut settings)
+            .contains(&Action::DpadReleased)
+    );
+    assert_eq!(
+        controller.update(Some(&GamepadFrame::default()), TICK, &mut settings),
+        vec![Action::DpadReleased]
+    );
+    assert!(
+        controller
+            .update(Some(&GamepadFrame::default()), TICK, &mut settings)
+            .is_empty()
     );
 }
 
@@ -359,7 +411,8 @@ fn pause_and_disconnect_request_system_keyboard_close() {
         let open_actions =
             controller.update(Some(&pressed(Button::RightStick)), TICK, &mut settings);
         assert!(open_actions.contains(&Action::OnScreenKeyboard(true)));
-        let pause = pressed(Button::Start);
+        let mut pause = pressed(Button::Start);
+        pause.buttons[Button::Select as usize] = true;
         let frame = if disconnect { None } else { Some(&pause) };
         let actions = controller.update(frame, TICK, &mut settings);
         assert!(actions.contains(&Action::OnScreenKeyboard(false)));
@@ -410,7 +463,7 @@ fn ctrl_enter_uses_a_single_chord_and_releases_the_virtual_modifier() {
     controller.update(Some(&pressed(Button::RightStick)), TICK, &mut settings);
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     controller.keyboard.modifiers.control = true;
-    controller.keyboard.selected_row = 2;
+    controller.keyboard.selected_row = 3;
     controller.keyboard.selected_column = 12; // Enter
     let actions = controller.update(Some(&pressed(Button::South)), TICK, &mut settings);
     assert_eq!(
@@ -513,7 +566,7 @@ fn caps_and_shift_affect_letters_without_changing_number_keys() {
         controller.update(Some(&pressed(Button::South)), TICK, &mut settings),
         vec![Action::Keyboard(KeyboardInput::Character('a'))]
     );
-    controller.keyboard.selected_row = 0;
+    controller.keyboard.selected_row = 1;
     controller.keyboard.selected_column = 1;
     controller.update(Some(&GamepadFrame::default()), TICK, &mut settings);
     assert_eq!(

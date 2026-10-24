@@ -4,7 +4,7 @@ use evdev::{
 };
 use std::env;
 
-use crate::control::{Action, KeyboardInput, MouseButton, SystemKey};
+use crate::control::{Action, DpadDirection, KeyboardInput, MouseButton, SystemKey};
 use crate::{
     keyboard::{KeyboardModifiers, KeyboardPresentation, KeyboardSession},
     wayland_keyboard::WaylandKeyboardOverlay,
@@ -78,6 +78,12 @@ impl Platform {
         self.keyboard_overlay_error.as_deref()
     }
 
+    pub(crate) fn update_native_dpad_target(&mut self) {}
+
+    pub(crate) fn update_mouse_mode(&mut self, _: bool, _: bool) -> Result<(), String> {
+        Ok(())
+    }
+
     pub fn update_keyboard_overlay(&mut self, session: &KeyboardSession) -> Result<(), String> {
         let Some(overlay) = &mut self.keyboard_overlay else {
             return Ok(());
@@ -124,6 +130,16 @@ impl Platform {
                 };
                 self.emit_key(code)
             }
+            Action::Dpad(direction) => {
+                let code = match direction {
+                    DpadDirection::Up => KeyCode::KEY_UP,
+                    DpadDirection::Down => KeyCode::KEY_DOWN,
+                    DpadDirection::Left => KeyCode::KEY_LEFT,
+                    DpadDirection::Right => KeyCode::KEY_RIGHT,
+                };
+                self.emit_key(code)
+            }
+            Action::DpadReleased => return Ok(()),
             Action::Keyboard(input) => {
                 self.emit_keyboard_input(input, KeyboardModifiers::default())
             }
@@ -158,6 +174,24 @@ impl Platform {
         let (key, shifted) = match input {
             KeyboardInput::Character(character) => ascii_key(character)
                 .ok_or_else(|| std::io::Error::other("caractere não suportado"))?,
+            KeyboardInput::Function(number) => (
+                match number {
+                    1 => KeyCode::KEY_F1,
+                    2 => KeyCode::KEY_F2,
+                    3 => KeyCode::KEY_F3,
+                    4 => KeyCode::KEY_F4,
+                    5 => KeyCode::KEY_F5,
+                    6 => KeyCode::KEY_F6,
+                    7 => KeyCode::KEY_F7,
+                    8 => KeyCode::KEY_F8,
+                    9 => KeyCode::KEY_F9,
+                    10 => KeyCode::KEY_F10,
+                    11 => KeyCode::KEY_F11,
+                    12 => KeyCode::KEY_F12,
+                    _ => return Err(std::io::Error::other("tecla de função inválida")),
+                },
+                false,
+            ),
             KeyboardInput::Backspace => (KeyCode::KEY_BACKSPACE, false),
             KeyboardInput::Enter => (KeyCode::KEY_ENTER, false),
             KeyboardInput::Escape => (KeyCode::KEY_ESC, false),

@@ -21,13 +21,16 @@
 - `make web-build` creates a production extension build; `make web-package` creates its ZIP.
 - `make web-test` builds the WXT `e2e` mode and runs Playwright against Chromium; run `npx playwright install chromium` from `extension/` once to install its browser.
 - `make desktop-run`, `make desktop-check`, `make desktop-lint`, `make desktop-format`, and `make desktop-test` run the Rust app workflows.
-- `make desktop-linux-package` and `make desktop-windows` create platform release packages.
+- `make desktop-build` creates Linux and Windows x64 release packages in `desktop/dist`; install the Windows Rust target, MinGW, CMake, and `zip` first.
+- `make desktop-linux-package` and `make desktop-windows` build each platform package separately.
 
 ## Coding Style and Naming Conventions
 
 Use strict TypeScript and preserve the existing two-space indentation, single quotes, and semicolons in `extension/`. Prefer explicit types at browser API and message boundaries. Use `camelCase` for variables and functions; keep module filenames lowercase. Run the configured Oxfmt and Oxlint commands for finished changes.
 
 ## Testing Guidelines
+
+Always follow Red → Green for behavior changes: first add a focused test that fails for the missing behavior and run it, then implement the smallest change that makes it pass, and finally run the relevant test suite.
 
 Before submitting, run the relevant extension format, lint, typecheck, and build commands, plus the desktop format, lint, check, and test commands. E2E tests use deterministic standard-mapped input frames and verify focus movement, activation, pause/resume, browser history, and tab switching. Physical controller behavior still needs manual validation; automated extension coverage targets Chromium and standard mappings.
 

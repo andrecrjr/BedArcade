@@ -3,10 +3,15 @@ pub mod focused_input;
 pub mod gamepads;
 pub mod i18n;
 pub mod keyboard;
+pub(crate) mod notifications;
 pub mod placement;
 pub mod preferences;
 pub mod runtime;
+pub(crate) mod startup;
 pub mod tray;
+
+#[cfg(any(target_os = "windows", test))]
+mod windows_navigation;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]

@@ -76,7 +76,7 @@ Os rótulos abaixo descrevem também as posições físicas dos quatro botões f
 | L3                             | Super / tecla Windows                  |
 | LB / L1                        | Tab                                    |
 | RB / R1                        | Alt+Tab                                |
-| Start / Menu / +               | Pausar ou retomar                      |
+| Start + Select / Menu + View   | Pausar ou retomar; solte e centralize para retomar |
 
 No teclado visual, o botão inferior digita a tecla selecionada; o direito apaga; o esquerdo envia Enter; o superior envia Escape; L3 envia espaço; L1 envia Tab; R1 alterna Shift.
 

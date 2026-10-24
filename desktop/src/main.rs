@@ -7,7 +7,7 @@ use eframe::egui::{self, Color32, RichText};
 use gamepad_desktop::runtime::{DesktopRuntime, RuntimeState};
 use gamepad_desktop::tray::{PanelControl, TrayAction, TrayMenu, create_tray, gamepad_icon_data};
 use gamepad_desktop::{
-    control::{KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS},
+    control::{ControlMode, KEYBOARD_SHORTCUTS, MOUSE_SHORTCUTS},
     i18n::{Locale, Text},
     keyboard::{self, KeyboardPosition, KeyboardPresentation, KeyboardSession},
 };
@@ -16,12 +16,94 @@ use std::{
     time::Duration,
 };
 
+mod gamepad_icons;
 mod keyboard_view;
 #[cfg(target_os = "windows")]
 mod windows_keyboard_overlay;
 
 type SharedDesktop = Arc<Mutex<DesktopRuntime>>;
+const APP_NAME: &str = "GamepadDesktop";
 const TWO_COLUMN_LAYOUT_MIN_WIDTH: f32 = 960.0;
+const UI_REPAINT_INTERVAL: Duration = Duration::from_millis(16);
+const ACCENT: Color32 = Color32::from_rgb(94, 234, 212);
+const PAGE_BACKGROUND: Color32 = Color32::from_rgb(8, 12, 21);
+const CARD_BACKGROUND: Color32 = Color32::from_rgb(15, 22, 36);
+const WIDGET_BACKGROUND: Color32 = Color32::from_rgb(23, 34, 54);
+const BORDER: Color32 = Color32::from_rgb(42, 59, 82);
+const TEXT: Color32 = Color32::from_rgb(228, 235, 244);
+const MUTED_TEXT: Color32 = Color32::from_rgb(160, 177, 197);
+const DANGER: Color32 = Color32::from_rgb(255, 126, 140);
+const WARNING: Color32 = Color32::from_rgb(255, 191, 105);
+const KEYCAP_BORDER: Color32 = Color32::from_rgb(51, 103, 112);
+
+fn configure_desktop_style(context: &egui::Context) {
+    egui_extras::install_image_loaders(context);
+    let mut visuals = egui::Visuals::dark();
+    visuals.override_text_color = Some(TEXT);
+    visuals.weak_text_color = Some(MUTED_TEXT);
+    visuals.panel_fill = PAGE_BACKGROUND;
+    visuals.window_fill = CARD_BACKGROUND;
+    visuals.faint_bg_color = Color32::from_rgb(19, 29, 46);
+    visuals.extreme_bg_color = Color32::from_rgb(7, 10, 18);
+    visuals.code_bg_color = Color32::from_rgb(19, 29, 46);
+    visuals.hyperlink_color = ACCENT;
+    visuals.selection.bg_fill = Color32::from_rgb(32, 94, 91);
+    visuals.window_stroke = egui::Stroke::new(1.0, BORDER);
+    visuals.window_corner_radius = egui::CornerRadius::same(12);
+    visuals.widgets.noninteractive.bg_fill = CARD_BACKGROUND;
+    visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, BORDER);
+    visuals.widgets.noninteractive.fg_stroke.color = TEXT;
+    visuals.widgets.inactive.bg_fill = WIDGET_BACKGROUND;
+    visuals.widgets.inactive.weak_bg_fill = WIDGET_BACKGROUND;
+    visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, BORDER);
+    visuals.widgets.inactive.fg_stroke.color = TEXT;
+    visuals.widgets.hovered.bg_fill = Color32::from_rgb(27, 58, 69);
+    visuals.widgets.hovered.weak_bg_fill = Color32::from_rgb(27, 58, 69);
+    visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, ACCENT);
+    visuals.widgets.active.bg_fill = Color32::from_rgb(32, 94, 91);
+    visuals.widgets.active.weak_bg_fill = Color32::from_rgb(32, 94, 91);
+    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, ACCENT);
+    context.set_visuals(visuals);
+    context.global_style_mut(|style| {
+        style.spacing.item_spacing = egui::vec2(12.0, 10.0);
+        style.spacing.window_margin = egui::Margin::same(16);
+        style.spacing.button_padding = egui::vec2(12.0, 7.0);
+        style.spacing.slider_width = 180.0;
+    });
+}
+
+fn card_frame() -> egui::Frame {
+    egui::Frame::new()
+        .fill(CARD_BACKGROUND)
+        .stroke(egui::Stroke::new(1.0, BORDER))
+        .corner_radius(12)
+        .inner_margin(16)
+}
+
+fn status_badge(ui: &mut egui::Ui, text: &str, color: Color32) {
+    let fill = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 36);
+    let stroke = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 130);
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(egui::Stroke::new(1.0, stroke))
+        .corner_radius(8)
+        .inner_margin(egui::Margin::symmetric(10, 5))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let (dot, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
+                ui.painter().circle_filled(dot.center(), 4.0, color);
+                ui.label(RichText::new(text).strong().color(color));
+            });
+        });
+}
+
+fn accent_heading(ui: &mut egui::Ui, text: &str) {
+    ui.horizontal(|ui| {
+        let (bar, _) = ui.allocate_exact_size(egui::vec2(3.0, 18.0), egui::Sense::hover());
+        ui.painter().rect_filled(bar, 1.5, ACCENT);
+        ui.label(RichText::new(text).strong().size(17.0).color(ACCENT));
+    });
+}
 
 fn uses_two_columns(available_width: f32) -> bool {
     available_width >= TWO_COLUMN_LAYOUT_MIN_WIDTH
@@ -59,7 +141,7 @@ impl eframe::App for GamepadDesktopApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         handle_panel_close(ui.ctx(), &self.panel, self.tray_error.is_none());
-        ui.ctx().request_repaint_after(Duration::from_millis(50));
+        ui.ctx().request_repaint_after(UI_REPAINT_INTERVAL);
         let mut state = self.desktop.lock().expect("desktop runtime lock").state();
         let locale = state.locale;
         let keyboard = state.keyboard.clone();
@@ -75,35 +157,85 @@ impl eframe::App for GamepadDesktopApp {
         });
         egui::CentralPanel::default().show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
+                egui::Frame::new()
+                    .fill(Color32::from_rgb(13, 20, 32))
+                    .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 104, 102)))
+                    .corner_radius(12)
+                    .inner_margin(14)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let (bar, _) =
+                                ui.allocate_exact_size(egui::vec2(4.0, 28.0), egui::Sense::hover());
+                            ui.painter().rect_filled(bar, 2.0, ACCENT);
+                            ui.label(RichText::new(APP_NAME).strong().size(22.0));
+                            if state.ready && state.error.is_none() && state.controller.is_some() {
+                                let (mode, color) = if state.keyboard.open {
+                                    (locale.text(Text::KeyboardVisual), ACCENT)
+                                } else if state.settings.mode == ControlMode::Game {
+                                    (locale.text(Text::GameModeBadge), ACCENT)
+                                } else if state.settings.enabled {
+                                    (locale.text(Text::DesktopMode), ACCENT)
+                                } else {
+                                    (locale.text(Text::PausedLabel), WARNING)
+                                };
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| status_badge(ui, mode, color),
+                                );
+                            }
+                        });
+                        ui.add_space(8.0);
+                        if show_mode_guide(ui, &mut state) {
+                            self.desktop
+                                .lock()
+                                .expect("desktop runtime lock")
+                                .configure(state.settings);
+                        }
+                    });
+                ui.add_space(10.0);
                 let desktop = &self.desktop;
                 let panel = &self.panel;
                 let tray_error = self.tray_error.as_deref();
                 let tray_menu = self.tray_menu.as_ref();
                 let mapping_text = &mut self.mapping_text;
-                let style = ui.style().clone();
                 if uses_two_columns(ui.available_width()) {
-                    ui.columns(2, |columns| {
-                        egui::Frame::group(&style).show(&mut columns[0], |ui| {
-                            show_desktop_overview(ui, &state, desktop);
-                        });
-                        egui::Frame::group(&style).show(&mut columns[1], |ui| {
-                            show_desktop_settings(
-                                ui,
-                                &mut state,
-                                desktop,
-                                mapping_text,
-                                tray_error,
-                                panel,
-                                tray_menu,
-                            );
-                        });
+                    let available_width = ui.available_width() - ui.spacing().item_spacing.x;
+                    let overview_width = available_width * 0.56;
+                    let settings_width = available_width - overview_width;
+                    ui.horizontal_top(|ui| {
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(overview_width, 0.0),
+                            egui::Layout::top_down_justified(egui::Align::Min),
+                            |ui| {
+                                card_frame().show(ui, |ui| {
+                                    show_desktop_overview(ui, &state, desktop);
+                                });
+                            },
+                        );
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(settings_width, 0.0),
+                            egui::Layout::top_down_justified(egui::Align::Min),
+                            |ui| {
+                                card_frame().show(ui, |ui| {
+                                    show_desktop_settings(
+                                        ui,
+                                        &mut state,
+                                        desktop,
+                                        mapping_text,
+                                        tray_error,
+                                        panel,
+                                        tray_menu,
+                                    );
+                                });
+                            },
+                        );
                     });
                 } else {
-                    egui::Frame::group(&style).show(ui, |ui| {
+                    card_frame().show(ui, |ui| {
                         show_desktop_overview(ui, &state, desktop);
                     });
                     ui.add_space(8.0);
-                    egui::Frame::group(&style).show(ui, |ui| {
+                    card_frame().show(ui, |ui| {
                         show_desktop_settings(
                             ui,
                             &mut state,
@@ -120,25 +252,66 @@ impl eframe::App for GamepadDesktopApp {
     }
 }
 
+fn show_mode_guide(ui: &mut egui::Ui, state: &mut RuntimeState) -> bool {
+    let locale = state.locale;
+    ui.label(locale.text(Text::PanelIntro));
+    ui.add_space(10.0);
+    gamepad_icons::show_family_selector(
+        ui,
+        locale.text(Text::ControllerSymbols),
+        locale.text(Text::ControllerSymbolsHelp),
+    );
+    ui.add_space(10.0);
+    ui.strong(locale.text(Text::ChooseMode));
+    let previous = state.settings.mode;
+    for (mode, label, description) in [
+        (
+            ControlMode::Desktop,
+            Text::DesktopMode,
+            Text::DesktopModeHelp,
+        ),
+        (ControlMode::Game, Text::GameMode, Text::GameModeHelp),
+    ] {
+        egui::Frame::new()
+            .fill(WIDGET_BACKGROUND)
+            .stroke(egui::Stroke::new(
+                1.0,
+                if state.settings.mode == mode {
+                    ACCENT
+                } else {
+                    KEYCAP_BORDER
+                },
+            ))
+            .corner_radius(8)
+            .inner_margin(10)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.selectable_value(&mut state.settings.mode, mode, locale.text(label));
+                ui.label(locale.text(description));
+            });
+        ui.add_space(5.0);
+    }
+    ui.add_space(8.0);
+    shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[12..13]);
+    shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[11..12]);
+    if state.settings.mode == ControlMode::Desktop && !state.settings.enabled {
+        ui.colored_label(WARNING, locale.text(Text::Paused));
+    }
+    ui.small(locale.text(Text::ResumeGuide));
+    previous != state.settings.mode
+}
+
 fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &SharedDesktop) {
     let locale = state.locale;
-    ui.heading(locale.text(Text::DesktopControl));
     if let Some(error) = &state.error {
-        ui.colored_label(Color32::LIGHT_RED, locale.translate(error));
+        ui.colored_label(DANGER, locale.translate(error));
     } else if !state.ready {
         ui.label(locale.text(Text::Connecting));
     } else if let Some(name) = &state.controller {
         ui.colored_label(
-            Color32::LIGHT_GREEN,
+            ACCENT,
             format!("{}{name}", locale.text(Text::ControllerPrefix)),
         );
-        ui.label(if state.keyboard.open {
-            locale.text(Text::KeyboardActive)
-        } else if state.settings.enabled {
-            locale.text(Text::MouseMode)
-        } else {
-            locale.text(Text::Paused)
-        });
     } else {
         ui.label(if state.devices.is_empty() {
             locale.text(Text::ConnectGamepad)
@@ -152,20 +325,6 @@ fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &Shar
         *desktop.lock().expect("desktop runtime lock") = runtime;
     }
     ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.label(
-            RichText::new(if state.keyboard.open {
-                locale.text(Text::KeyboardVisual)
-            } else if !state.settings.enabled {
-                locale.text(Text::PausedLabel)
-            } else {
-                locale.text(Text::MouseLabel)
-            })
-            .strong()
-            .size(20.0)
-            .color(Color32::LIGHT_GREEN),
-        );
-    });
     if state.keyboard.presentation != KeyboardPresentation::Unavailable
         && let Some(status) = &state.keyboard.status
     {
@@ -177,14 +336,33 @@ fn show_desktop_overview(ui: &mut egui::Ui, state: &RuntimeState, desktop: &Shar
     if state.keyboard.presentation == KeyboardPresentation::Unavailable
         && let Some(status) = &state.keyboard.status
     {
-        ui.colored_label(Color32::LIGHT_RED, locale.translate(status));
+        ui.colored_label(DANGER, locale.translate(status));
     }
+    ui.add_space(8.0);
     ui.separator();
-    ui.heading(locale.text(Text::DesktopCommands));
-    shortcut_guide(ui, locale, MOUSE_SHORTCUTS);
-    ui.collapsing(locale.text(Text::KeyboardCommands), |ui| {
-        shortcut_guide(ui, locale, KEYBOARD_SHORTCUTS);
-    });
+    accent_heading(ui, locale.text(Text::CommandGuide));
+    if state.settings.mode == ControlMode::Game {
+        ui.label(locale.text(Text::GameCommandsHelp));
+    }
+    egui::CollapsingHeader::new(locale.text(Text::DesktopCommands))
+        .default_open(state.settings.mode == ControlMode::Desktop && !state.keyboard.open)
+        .show(ui, |ui| {
+            ui.small(locale.text(Text::DesktopCommandsHelp));
+            ui.strong(locale.text(Text::PointerCommands));
+            shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[2..6]);
+            ui.add_space(10.0);
+            ui.strong(locale.text(Text::NavigationCommands));
+            shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[6..11]);
+            shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[1..2]);
+        });
+    egui::CollapsingHeader::new(locale.text(Text::KeyboardCommands))
+        .default_open(state.keyboard.open)
+        .show(ui, |ui| {
+            ui.small(locale.text(Text::KeyboardCommandsHelp));
+            shortcut_guide(ui, locale, &MOUSE_SHORTCUTS[..1]);
+            ui.add_space(8.0);
+            shortcut_guide(ui, locale, KEYBOARD_SHORTCUTS);
+        });
     ui.small(locale.text(Text::ButtonPositionNote));
 }
 
@@ -197,7 +375,7 @@ fn show_desktop_settings(
     panel: &PanelControl,
     tray_menu: Option<&TrayMenu>,
 ) {
-    ui.heading(state.locale.text(Text::Settings));
+    accent_heading(ui, state.locale.text(Text::Settings));
     let mut locale = state.locale;
     ui.horizontal(|ui| {
         ui.label(state.locale.text(Text::Language));
@@ -227,67 +405,90 @@ fn show_desktop_settings(
         ));
     }
     let locale = state.locale;
-    egui::CollapsingHeader::new(locale.text(Text::ControlsAndAdjustments)).show(ui, |ui| {
-        let mut selected = state.selected;
-        let selected_name = if selected.is_none() {
-            locale.text(Text::Automatic)
+    let mut start_on_login = state.start_on_login;
+    if ui
+        .checkbox(&mut start_on_login, locale.text(Text::StartWithOS))
+        .changed()
+    {
+        let result = desktop
+            .lock()
+            .expect("desktop runtime lock")
+            .configure_start_on_login(start_on_login);
+        if let Err(error) = result {
+            state.preferences_error = Some(error);
         } else {
-            state
-                .devices
-                .iter()
-                .find(|device| Some(device.id) == selected)
-                .map_or(locale.text(Text::DisconnectedController), |device| {
-                    device.name.as_str()
-                })
-        };
-        egui::ComboBox::from_id_salt("desktop-controller")
-            .selected_text(selected_name)
-            .show_ui(ui, |ui| {
-                ui.selectable_value(&mut selected, None, locale.text(Text::Automatic));
-                for device in &state.devices {
-                    let label = format!(
-                        "{}{}",
-                        device.name,
-                        if device.mapped {
-                            ""
-                        } else {
-                            locale.text(Text::NeedsProfile)
-                        }
-                    );
-                    ui.selectable_value(&mut selected, Some(device.id), label);
-                }
+            state.start_on_login = start_on_login;
+        }
+    }
+    egui::CollapsingHeader::new(locale.text(Text::ControlsAndAdjustments))
+        .default_open(true)
+        .show(ui, |ui| {
+            let mut selected = state.selected;
+            let selected_name = if selected.is_none() {
+                locale.text(Text::Automatic)
+            } else {
+                state
+                    .devices
+                    .iter()
+                    .find(|device| Some(device.id) == selected)
+                    .map_or(locale.text(Text::DisconnectedController), |device| {
+                        device.name.as_str()
+                    })
+            };
+            egui::ComboBox::from_id_salt("desktop-controller")
+                .selected_text(selected_name)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut selected, None, locale.text(Text::Automatic));
+                    for device in &state.devices {
+                        let label = format!(
+                            "{}{}",
+                            device.name,
+                            if device.mapped {
+                                ""
+                            } else {
+                                locale.text(Text::NeedsProfile)
+                            }
+                        );
+                        ui.selectable_value(&mut selected, Some(device.id), label);
+                    }
+                });
+            if selected != state.selected {
+                desktop
+                    .lock()
+                    .expect("desktop runtime lock")
+                    .select_controller(selected);
+            }
+            let mode = state.settings.mode;
+            let mut changed = false;
+            ui.add_enabled_ui(mode == ControlMode::Desktop, |ui| {
+                changed |= ui
+                    .checkbox(
+                        &mut state.settings.enabled,
+                        locale.text(Text::ControlDesktop),
+                    )
+                    .changed();
             });
-        if selected != state.selected {
-            desktop
-                .lock()
-                .expect("desktop runtime lock")
-                .select_controller(selected);
-        }
-        let mut changed = ui
-            .checkbox(
-                &mut state.settings.enabled,
-                locale.text(Text::ControlDesktop),
-            )
-            .changed();
-        changed |= ui
-            .add(
-                egui::Slider::new(&mut state.settings.speed, 100.0..=2400.0)
-                    .text(locale.text(Text::Speed)),
-            )
-            .changed();
-        changed |= ui
-            .add(
-                egui::Slider::new(&mut state.settings.deadzone, 0.05..=0.5)
-                    .text(locale.text(Text::Deadzone)),
-            )
-            .changed();
-        if changed {
-            desktop
-                .lock()
-                .expect("desktop runtime lock")
-                .configure(state.settings);
-        }
-    });
+            ui.add_enabled_ui(mode == ControlMode::Desktop, |ui| {
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut state.settings.speed, 100.0..=2400.0)
+                            .text(locale.text(Text::Speed)),
+                    )
+                    .changed();
+                changed |= ui
+                    .add(
+                        egui::Slider::new(&mut state.settings.deadzone, 0.05..=0.5)
+                            .text(locale.text(Text::Deadzone)),
+                    )
+                    .changed();
+            });
+            if changed {
+                desktop
+                    .lock()
+                    .expect("desktop runtime lock")
+                    .configure(state.settings);
+            }
+        });
     egui::CollapsingHeader::new(locale.text(Text::CustomizeKeyboard)).show(ui, |ui| {
         let mut settings = state.keyboard.settings;
         let mut changed = ui
@@ -357,7 +558,7 @@ fn show_desktop_settings(
     });
     if let Some(error) = tray_error {
         ui.colored_label(
-            Color32::LIGHT_RED,
+            DANGER,
             format!(
                 "{}{error}. {}",
                 locale.text(Text::TrayUnavailablePrefix),
@@ -367,7 +568,10 @@ fn show_desktop_settings(
     } else {
         ui.label(locale.text(Text::ClosePanelKeepsRunning));
     }
-    if ui.button(locale.text(Text::QuitApplication)).clicked() {
+    let quit = egui::Button::new(locale.text(Text::QuitApplication))
+        .fill(Color32::from_rgb(71, 37, 48))
+        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(130, 62, 77)));
+    if ui.add(quit).clicked() {
         panel.exit();
     }
     egui::CollapsingHeader::new(locale.text(Text::ControllerProfiles)).show(ui, |ui| {
@@ -506,7 +710,7 @@ fn keyboard_viewport_builder(
 
 fn main_viewport_builder(windows: bool) -> egui::ViewportBuilder {
     egui::ViewportBuilder::default()
-        .with_title("Gamepad Desktop")
+        .with_title(APP_NAME)
         .with_icon(gamepad_icon_data(512))
         .with_inner_size([860.0, 760.0])
         .with_min_inner_size([660.0, 500.0])
@@ -601,24 +805,32 @@ fn keyboard_viewport_ui(ui: &mut egui::Ui, session: &KeyboardSession) {
     if session.open {
         windows_keyboard_overlay::enable_click_through();
     }
-    ui.ctx().request_repaint_after(Duration::from_millis(50));
+    ui.ctx().request_repaint_after(UI_REPAINT_INTERVAL);
     keyboard_view::show(ui, session);
 }
 
 fn shortcut_guide(ui: &mut egui::Ui, locale: Locale, shortcuts: &[(&str, &str)]) {
     egui::Grid::new(ui.next_auto_id())
         .num_columns(2)
-        .striped(true)
-        .spacing([24.0, 9.0])
+        .max_col_width((ui.available_width() - 16.0) / 2.0)
+        .spacing([16.0, 9.0])
         .show(ui, |ui| {
             for (button, action) in shortcuts {
-                let button = locale.translate(button);
+                let source_button = *button;
+                let button = locale.translate(source_button);
                 let action = locale.translate(action);
-                ui.label(
-                    RichText::new(button)
-                        .strong()
-                        .color(Color32::from_rgb(100, 220, 200)),
-                );
+                let family = gamepad_icons::family(ui.ctx());
+                egui::Frame::new()
+                    .fill(WIDGET_BACKGROUND)
+                    .stroke(egui::Stroke::new(1.0, KEYCAP_BORDER))
+                    .corner_radius(6)
+                    .inner_margin(egui::Margin::symmetric(7, 3))
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            gamepad_icons::show_shortcut_icons(ui, family, source_button);
+                            ui.label(RichText::new(button).strong().color(ACCENT));
+                        });
+                    });
                 ui.label(action);
                 ui.end_row();
             }
@@ -649,6 +861,7 @@ fn acquire_instance_lock() -> std::io::Result<Option<std::fs::File>> {
 }
 
 fn main() -> eframe::Result {
+    let background_start = std::env::args_os().any(|argument| argument == "--background");
     #[cfg(target_os = "linux")]
     let _instance_lock = match acquire_instance_lock() {
         Ok(Some(lock)) => lock,
@@ -666,7 +879,8 @@ fn main() -> eframe::Result {
     let tray = tray_result.map(|(icon, _)| icon);
     loop {
         let options = eframe::NativeOptions {
-            viewport: main_viewport_builder(cfg!(target_os = "windows")),
+            viewport: main_viewport_builder(cfg!(target_os = "windows"))
+                .with_visible(!background_start || tray.is_err()),
             run_and_return: true,
             ..Default::default()
         };
@@ -676,10 +890,10 @@ fn main() -> eframe::Result {
         let app_error = tray_error.clone();
         let app_tray_menu = tray_menu.clone();
         eframe::run_native(
-            "Gamepad Desktop",
+            APP_NAME,
             options,
             Box::new(move |creation_context| {
-                creation_context.egui_ctx.set_visuals(egui::Visuals::dark());
+                configure_desktop_style(&creation_context.egui_ctx);
                 app_panel.attach(Some(creation_context.egui_ctx.clone()));
                 Ok(Box::new(GamepadDesktopApp::new(
                     app_desktop,
@@ -784,6 +998,7 @@ mod tests {
     #[test]
     fn shortcut_guides_fit_the_minimum_panel_width() {
         let context = egui::Context::default();
+        configure_desktop_style(&context);
         let input = egui::RawInput {
             screen_rect: Some(egui::Rect::from_min_size(
                 egui::Pos2::ZERO,
@@ -810,6 +1025,35 @@ mod tests {
             });
         });
         output.textures_delta.clear();
+    }
+
+    #[test]
+    fn mode_guide_fits_a_narrow_panel_in_every_language_and_mode() {
+        for locale in Locale::ALL {
+            for mode in [ControlMode::Desktop, ControlMode::Game] {
+                let context = egui::Context::default();
+                configure_desktop_style(&context);
+                let mut state = RuntimeState::default();
+                state.locale = locale;
+                state.settings.mode = mode;
+                state.settings.enabled = false;
+                let mut output = context.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(620.0, 1400.0),
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| {
+                        assert!(!show_mode_guide(ui, &mut state));
+                        assert!(ui.min_rect().right() <= 620.0);
+                    },
+                );
+                output.textures_delta.clear();
+                assert_eq!(state.settings.mode, mode);
+            }
+        }
     }
 
     #[test]
